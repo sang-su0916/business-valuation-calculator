@@ -6,6 +6,46 @@ st.set_page_config(
     layout="wide"
 )
 
+# 사이드바 스타일 커스터마이징
+st.markdown("""
+<style>
+    .sidebar .sidebar-content {
+        background-color: #f0f2f6;
+    }
+    span.css-10trblm.e16nr0p30 {
+        color: #262730;
+        font-weight: bold;
+    }
+    section[data-testid="stSidebar"] div.element-container div.stButton button {
+        background-color: #ffffff;
+        color: #262730;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        padding: 10px 15px;
+        width: 100%;
+        text-align: center;
+        margin-bottom: 10px;
+        font-weight: bold;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    section[data-testid="stSidebar"] div.element-container div.stButton button:hover {
+        background-color: #f8f9fa;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+    }
+    [data-testid="stSidebarNav"] {
+        background-color: #f0f2f6;
+        padding-top: 10px;
+        padding-bottom: 10px;
+    }
+    [data-testid="stSidebarNav"] ul {
+        padding-left: 20px;
+    }
+    [data-testid="stSidebarNav"] li {
+        margin-bottom: 10px;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # 메인 콘텐츠
 st.title("기업가치 약식 평가계산기")
 st.markdown("상속세 및 증여세법에 따른 비상장주식 평가와 세금 계산")
