@@ -586,7 +586,7 @@ else:
    st.markdown("</ul>", unsafe_allow_html=True)
    st.markdown("</div>", unsafe_allow_html=True)
    
-   # 세금 증가 예상
+    # 세금 증가 예상
     st.markdown("<div class='tax-info-section'>", unsafe_allow_html=True)
     st.markdown("<h3>세금 증가 예상</h3>", unsafe_allow_html=True)
     
