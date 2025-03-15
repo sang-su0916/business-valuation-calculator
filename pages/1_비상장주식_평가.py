@@ -126,7 +126,7 @@ with st.expander("회사 정보", expanded=True):
             key="company_name_input",
             label_visibility="collapsed"
         )
-        st.markdown("<div class='field-description'>회사의 정식 법인명을 입력하세요. 예: '주식회사 에이비씨'</div>", unsafe_allow_html=True)
+        # 회사명 설명 제거함
     
     with col2:
         st.markdown("<div class='section-header'>자본총계 (원)</div>", unsafe_allow_html=True)
@@ -159,7 +159,7 @@ with st.expander("당기순이익 (최근 3개년)", expanded=True):
             label_visibility="collapsed"
         )
         st.markdown(f"<div class='amount-display'>금액: {format_number(net_income1)}원</div>", unsafe_allow_html=True)
-        st.markdown("<div class='field-description'>평가 기준일로부터 가장 최근 연도의 당기순이익입니다. 가중평균 계산 시 3배로 반영됩니다.</div>", unsafe_allow_html=True)
+        # 설명 제거함
         
     with col2:
         st.markdown("##### 2년 전 (가중치 2배)")
@@ -172,7 +172,7 @@ with st.expander("당기순이익 (최근 3개년)", expanded=True):
             label_visibility="collapsed"
         )
         st.markdown(f"<div class='amount-display'>금액: {format_number(net_income2)}원</div>", unsafe_allow_html=True)
-        st.markdown("<div class='field-description'>평가 기준일로부터 2년 전 당기순이익입니다. 가중평균 계산 시 2배로 반영됩니다.</div>", unsafe_allow_html=True)
+        # 설명 제거함
         
     with col3:
         st.markdown("##### 3년 전 (가중치 1배)")
@@ -185,7 +185,7 @@ with st.expander("당기순이익 (최근 3개년)", expanded=True):
             label_visibility="collapsed"
         )
         st.markdown(f"<div class='amount-display'>금액: {format_number(net_income3)}원</div>", unsafe_allow_html=True)
-        st.markdown("<div class='field-description'>평가 기준일로부터 3년 전 당기순이익입니다. 가중평균 계산 시 1배로 반영됩니다.</div>", unsafe_allow_html=True)
+        # 설명 제거함
 
 # 주식 정보 입력
 with st.expander("주식 정보", expanded=True):
@@ -203,7 +203,7 @@ with st.expander("주식 정보", expanded=True):
             label_visibility="collapsed"
         )
         st.markdown(f"<div class='amount-display'>총 {format_number(shares)}주</div>", unsafe_allow_html=True)
-        st.markdown("<div class='field-description'>평가 기준일 현재 발행된 총 주식수입니다. 자사주 포함 모든 주식을 입력하세요.</div>", unsafe_allow_html=True)
+        # 설명 제거함
         
     with col2:
         st.markdown("<div class='section-header'>액면금액 (원)</div>", unsafe_allow_html=True)
@@ -217,7 +217,7 @@ with st.expander("주식 정보", expanded=True):
             label_visibility="collapsed"
         )
         st.markdown(f"<div class='amount-display'>금액: {format_number(share_price)}원</div>", unsafe_allow_html=True)
-        st.markdown("<div class='field-description'>주식 1주당 액면가액입니다. 정관에 명시된 금액을 입력하세요.</div>", unsafe_allow_html=True)
+        # 설명 제거함
         
     with col3:
         st.markdown("<div class='section-header'>환원율 (%)</div>", unsafe_allow_html=True)
@@ -267,7 +267,6 @@ with st.expander("주주 정보", expanded=True):
                 key=f"shareholder_name_input_{i}",
                 help=f"주주 {i+1}의 이름을 입력하세요."
             )
-            st.markdown("<div class='field-description'>주주의 실명을 입력하세요. 법인 주주인 경우 법인명을 입력하세요.</div>" if i == 0 else "", unsafe_allow_html=True)
         
         with col2:
             shares_owned = st.number_input(
@@ -280,7 +279,6 @@ with st.expander("주주 정보", expanded=True):
                 help=f"주주 {i+1}의 보유 주식수를 입력하세요."
             )
             st.markdown(f"<div class='amount-display'>{format_number(shares_owned)}주</div>", unsafe_allow_html=True)
-            st.markdown("<div class='field-description'>해당 주주가 보유한 주식수를 입력하세요.</div>" if i == 0 else "", unsafe_allow_html=True)
         
         # 구분선 추가
         if i < shareholder_count - 1:
@@ -338,7 +336,7 @@ with st.expander("평가 방식 선택", expanded=True):
     """, unsafe_allow_html=True)
     st.markdown("<div class='field-description'>상속세 및 증여세법 시행령 제54조에 근거한 평가방법입니다. 회사의 특성에 맞는 방법을 선택하세요.</div>", unsafe_allow_html=True)
 
-# 비상장주식 가치 계산 함수는 동일하게 유지
+# 비상장주식 가치 계산 함수 및 나머지 코드는 동일하게 유지
 def calculate_stock_value():
     # 코드 내용 유지...
     net_asset_per_share = total_equity / shares
