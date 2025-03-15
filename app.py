@@ -480,5 +480,5 @@ elif page == "3. 현시점 세금계산":
                 st.rerun()
         
         with col2:
-           if st.button("4. 미래 주식가치 계산하기", use_container_width=True):
-    st.write("미래 주식가치를 계산하는 기능을 실행합니다.")
+        if st.button("4. 미래 주식가치 계산하기", use_container_width=True):
+            st.write("미래 주식가치를 계산하는 기능을 실행합니다.")
