@@ -39,6 +39,8 @@ if 'shareholders' not in st.session_state:
         {"name": "", "shares": 0},
         {"name": "", "shares": 0}
     ]
+if 'shareholder_count' not in st.session_state:
+    st.session_state.shareholder_count = 1
 
 # 숫자 형식화 함수
 def format_number(num):
@@ -112,14 +114,21 @@ with st.expander("주식 정보", expanded=True):
 
 # 주주 정보 입력
 with st.expander("주주 정보", expanded=True):
-    st.info("회사의 주주 정보를 입력하세요 (최대 5명)")
+    shareholder_count = st.selectbox(
+        "입력할 주주 수를 선택하세요",
+        options=[1, 2, 3, 4, 5],
+        index=st.session_state.shareholder_count - 1
+    )
+    st.session_state.shareholder_count = shareholder_count
+    
+    st.info(f"회사의 주주 정보를 입력하세요 (선택된 주주 수: {shareholder_count}명)")
     
     # 총 주식수 확인을 위한 변수
     total_owned_shares = 0
     
-    # 5명의 주주 정보 입력
+    # 선택한 수만큼의 주주 정보 입력
     shareholders = []
-    for i in range(5):
+    for i in range(shareholder_count):
         col1, col2 = st.columns(2)
         with col1:
             name = st.text_input(
@@ -140,6 +149,13 @@ with st.expander("주주 정보", expanded=True):
         
         shareholders.append({"name": name, "shares": shares_owned})
         total_owned_shares += shares_owned
+    
+    # 나머지 주주 정보 보존 (보이지 않지만 데이터는 유지)
+    for i in range(shareholder_count, 5):
+        if i < len(st.session_state.shareholders):
+            shareholders.append(st.session_state.shareholders[i])
+        else:
+            shareholders.append({"name": "", "shares": 0})
     
     # 입력된 주식수 합계 확인
     if total_owned_shares > shares:
