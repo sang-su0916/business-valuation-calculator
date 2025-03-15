@@ -29,23 +29,32 @@ st.markdown("""
     .info-box {
         background-color: #f0f7fb;
         border-radius: 5px;
-        padding: 10px 15px;
-        margin: 10px 0;
+        padding: 15px;
+        margin: 10px 0 20px 0;
         color: #0c5460;
     }
-    .action-button {
-        margin-top: 10px;
-        padding: 5px;
-    }
-    .next-step-info {
+    .button-description {
         font-size: 0.9em;
-        color: #666;
-        margin: 5px 0 15px 0;
-        padding-left: 5px;
-        border-left: 3px solid #ddd;
+        color: #555;
+        margin: 5px 0 20px 0;
+        padding: 8px;
+        background-color: #f8f9fa;
+        border-radius: 4px;
     }
     .chart-container {
         margin-bottom: 20px;
+    }
+    .next-steps-header {
+        margin-top: 25px;
+        margin-bottom: 15px;
+        color: #333;
+    }
+    .footer-note {
+        margin-top: 30px;
+        font-size: 0.85em;
+        color: #666;
+        border-top: 1px solid #eee;
+        padding-top: 10px;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -54,10 +63,7 @@ st.markdown("""
 if not st.session_state.get('evaluated', False):
     st.warning("먼저 '비상장주식 평가' 페이지에서 평가를 진행해주세요.")
     if st.button("비상장주식 평가 페이지로 이동"):
-        try:
-            st.switch_page("1_비상장주식_평가.py")
-        except Exception as e:
-            st.error("페이지 이동 중 오류가 발생했습니다. 왼쪽 사이드바에서 '비상장주식 평가' 메뉴를 클릭해주세요.")
+        st.switch_page("1_비상장주식_평가.py")
 else:
     stock_value = st.session_state.stock_value
     company_name = st.session_state.company_name
@@ -140,10 +146,10 @@ else:
         st.plotly_chart(fig, use_container_width=True)
     st.markdown("</div>", unsafe_allow_html=True)
     
-    # 안내 메시지
+    # 다음 단계 안내
+    st.markdown("<h3 class='next-steps-header'>📌 다음 단계 안내</h3>", unsafe_allow_html=True)
     st.markdown("""
     <div class='info-box'>
-    📌 <b>다음 단계 안내</b><br>
     평가된 주식가치 결과를 바탕으로 다음 단계를 진행할 수 있습니다:
     <ul>
         <li><b>현시점 세금 계산하기</b>: 상속세, 증여세, 양도소득세 등을 계산합니다.</li>
@@ -157,23 +163,17 @@ else:
     col1, col2 = st.columns(2)
     with col1:
         if st.button("현시점 세금 계산하기", type="primary", use_container_width=True):
-            st.markdown("<div class='next-step-info'>상속세, 증여세, A양도소득세 등 현시점 기준 세금을 계산합니다.</div>", unsafe_allow_html=True)
-            try:
-                st.switch_page("3_현시점_세금계산.py")
-            except Exception as e:
-                st.error("페이지 이동 중 오류가 발생했습니다. 왼쪽 사이드바에서 '현시점 세금계산' 메뉴를 클릭해주세요.")
+            st.switch_page("3_현시점_세금계산.py")
+        st.markdown("<div class='button-description'>상속세, 증여세, 양도소득세 등 현시점 기준 세금을 계산합니다.</div>", unsafe_allow_html=True)
     
     with col2:
         if st.button("미래 주식가치 계산하기", type="primary", use_container_width=True):
-            st.markdown("<div class='next-step-info'>회사의 성장을 고려하여 미래 시점의 주식가치를 예측합니다.</div>", unsafe_allow_html=True)
-            try:
-                st.switch_page("4_미래_주식가치.py")
-            except Exception as e:
-                st.error("페이지 이동 중 오류가 발생했습니다. 왼쪽 사이드바에서 '미래 주식가치' 메뉴를 클릭해주세요.")
+            st.switch_page("4_미래_주식가치.py")
+        st.markdown("<div class='button-description'>회사의 성장을 고려하여 미래 시점의 주식가치를 예측합니다.</div>", unsafe_allow_html=True)
     
     # 추가 안내
     st.markdown("""
-    <div style='margin-top: 30px; font-size: 0.9em; color: #666;'>
+    <div class='footer-note'>
     * 평가 결과는 참고용으로만 사용하시고, 정확한 세금 계산을 위해서는 전문가와 상담하시기 바랍니다.
     </div>
     """, unsafe_allow_html=True)
