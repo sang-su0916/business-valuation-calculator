@@ -2,29 +2,80 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import locale
+
+# 숫자 형식화를 위한 로케일 설정
+try:
+    locale.setlocale(locale.LC_ALL, 'ko_KR.UTF-8')
+except:
+    try:
+        locale.setlocale(locale.LC_ALL, 'ko_KR')
+    except:
+        locale.setlocale(locale.LC_ALL, '')
 
 # 숫자 형식화 함수
 def format_number(num):
-    return f"{int(num):,}"
+    try:
+        return "{:,}".format(int(num))
+    except:
+        return str(num)
 
 # 페이지 헤더
 st.title("주식가치 평가 결과")
+
+# CSS 스타일 추가
+st.markdown("""
+<style>
+    .info-box {
+        background-color: #f0f7fb;
+        border-radius: 5px;
+        padding: 10px 15px;
+        margin: 10px 0;
+        color: #0c5460;
+    }
+    .action-button {
+        margin-top: 10px;
+        padding: 5px;
+    }
+    .next-step-info {
+        font-size: 0.9em;
+        color: #666;
+        margin: 5px 0 15px 0;
+        padding-left: 5px;
+        border-left: 3px solid #ddd;
+    }
+    .chart-container {
+        margin-bottom: 20px;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 # 결과 확인
 if not st.session_state.get('evaluated', False):
     st.warning("먼저 '비상장주식 평가' 페이지에서 평가를 진행해주세요.")
     if st.button("비상장주식 평가 페이지로 이동"):
-        st.switch_page("1_비상장주식_평가.py")
+        try:
+            st.switch_page("1_비상장주식_평가.py")
+        except Exception as e:
+            st.error("페이지 이동 중 오류가 발생했습니다. 왼쪽 사이드바에서 '비상장주식 평가' 메뉴를 클릭해주세요.")
 else:
     stock_value = st.session_state.stock_value
     company_name = st.session_state.company_name
     total_equity = st.session_state.total_equity
+    eval_date = st.session_state.get('eval_date', None)
+    
+    # 평가일자 정보 추가
+    date_info = f" ({eval_date.strftime('%Y년 %m월 %d일')} 기준)" if eval_date else ""
     
     col1, col2 = st.columns(2)
     with col1:
         st.markdown(f"### 회사명: {company_name}")
     with col2:
         st.markdown(f"### 적용 평가방식: {stock_value['methodText']}")
+    
+    # 평가 기준일 표시 (있는 경우)
+    if eval_date:
+        st.markdown(f"<div class='info-box'>평가 기준일: {eval_date.strftime('%Y년 %m월 %d일')}</div>", unsafe_allow_html=True)
     
     st.markdown("---")
     
@@ -66,6 +117,7 @@ else:
     st.info(f"자본총계({format_number(total_equity)}원) 대비 평가 회사가치는 **{stock_value['increasePercentage']}%**로 평가되었습니다.")
     
     # 차트 표시
+    st.markdown("<div class='chart-container'>", unsafe_allow_html=True)
     col1, col2 = st.columns(2)
     with col1:
         # 원형 차트 생성
@@ -86,13 +138,42 @@ else:
         ))
         fig.update_layout(title_text='주요 가치 비교 (주당)')
         st.plotly_chart(fig, use_container_width=True)
+    st.markdown("</div>", unsafe_allow_html=True)
+    
+    # 안내 메시지
+    st.markdown("""
+    <div class='info-box'>
+    📌 <b>다음 단계 안내</b><br>
+    평가된 주식가치 결과를 바탕으로 다음 단계를 진행할 수 있습니다:
+    <ul>
+        <li><b>현시점 세금 계산하기</b>: 상속세, 증여세, 양도소득세 등을 계산합니다.</li>
+        <li><b>미래 주식가치 계산하기</b>: 성장률을 적용하여 미래 주식가치를 예측합니다.</li>
+    </ul>
+    아래 버튼을 클릭하거나 왼쪽 사이드바에서 메뉴를 선택하여 진행하세요.
+    </div>
+    """, unsafe_allow_html=True)
     
     # 버튼 행
     col1, col2 = st.columns(2)
     with col1:
         if st.button("현시점 세금 계산하기", type="primary", use_container_width=True):
-            st.switch_page("3_현시점_세금계산.py")
+            st.markdown("<div class='next-step-info'>상속세, 증여세, A양도소득세 등 현시점 기준 세금을 계산합니다.</div>", unsafe_allow_html=True)
+            try:
+                st.switch_page("3_현시점_세금계산.py")
+            except Exception as e:
+                st.error("페이지 이동 중 오류가 발생했습니다. 왼쪽 사이드바에서 '현시점 세금계산' 메뉴를 클릭해주세요.")
     
     with col2:
         if st.button("미래 주식가치 계산하기", type="primary", use_container_width=True):
-            st.switch_page("4_미래_주식가치.py")
+            st.markdown("<div class='next-step-info'>회사의 성장을 고려하여 미래 시점의 주식가치를 예측합니다.</div>", unsafe_allow_html=True)
+            try:
+                st.switch_page("4_미래_주식가치.py")
+            except Exception as e:
+                st.error("페이지 이동 중 오류가 발생했습니다. 왼쪽 사이드바에서 '미래 주식가치' 메뉴를 클릭해주세요.")
+    
+    # 추가 안내
+    st.markdown("""
+    <div style='margin-top: 30px; font-size: 0.9em; color: #666;'>
+    * 평가 결과는 참고용으로만 사용하시고, 정확한 세금 계산을 위해서는 전문가와 상담하시기 바랍니다.
+    </div>
+    """, unsafe_allow_html=True)
