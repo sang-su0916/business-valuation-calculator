@@ -6,6 +6,18 @@ st.set_page_config(
     layout="wide"
 )
 
+# 사이드바 설정
+st.sidebar.title("메뉴")
+st.sidebar.info("""
+아래 페이지 목록에서 원하는 메뉴를 선택하세요:
+- 비상장주식 평가
+- 주식가치 결과
+- 현시점 세금계산
+- 미래 주식가치
+- 미래 세금계산
+""")
+
+# 메인 콘텐츠
 st.title("기업가치 약식 평가계산기")
 st.markdown("상속세 및 증여세법에 따른 비상장주식 평가와 세금 계산")
 st.markdown("---")
