@@ -14,7 +14,7 @@ st.title("주식가치 평가 결과")
 if not st.session_state.get('evaluated', False):
     st.warning("먼저 '비상장주식 평가' 페이지에서 평가를 진행해주세요.")
     if st.button("비상장주식 평가 페이지로 이동"):
-        st.switch_page("pages/1_비상장주식_평가.py")
+        st.switch_page("1_비상장주식_평가.py")
 else:
     stock_value = st.session_state.stock_value
     company_name = st.session_state.company_name
@@ -91,8 +91,8 @@ else:
     col1, col2 = st.columns(2)
     with col1:
         if st.button("현시점 세금 계산하기", type="primary", use_container_width=True):
-            st.switch_page("pages/3_현시점_세금계산.py")
+            st.switch_page("3_현시점_세금계산.py")
     
     with col2:
         if st.button("미래 주식가치 계산하기", type="primary", use_container_width=True):
-            st.switch_page("pages/4_미래_주식가치.py")
+            st.switch_page("4_미래_주식가치.py")
