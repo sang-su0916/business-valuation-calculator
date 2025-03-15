@@ -292,6 +292,7 @@ def calculate_liquidation_tax(income, acquisition_value):
     tax_formula = []
     
     # 법인세 계산 (일반법인의 경우)
+    # 오류가 발생한 조건문 수정
     if income <= 200000000:  # 2억 이하
         corporate_tax = income * 0.09  # 9%
         tax_formula.append(f"법인세: 2억원 × 9% = {simple_format(corporate_tax)}원")
@@ -347,7 +348,8 @@ def calculate_tax_details(value, owned_shares, share_price):
         "inheritanceRate": inheritance_rate,
         "transferRate": transfer_rate,
         "liquidationRate": liquidation_rate,
-        "inheritanceDetails": inheritance_details
+        "inheritanceDetails": inheritance_details,
+        "ownedValue": owned_value  # 명시적으로 owned_value 추가
     }
 
 if not st.session_state.get('evaluated', False):
@@ -411,29 +413,36 @@ else:
         st.markdown("<p>법인 청산 시 발생하는 세금으로, 법인세와 잔여재산 분배에 따른 배당소득세로 구성됩니다.</p>", unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
     
-    # 세금 계산 방법 상세 - 양도소득세 (이미지 2의 상단 예제와 유사하게 구성)
+    # 세금 계산 방법 세부내역 섹션
     with st.expander("양도소득세 계산 세부내역"):
         st.markdown("<div class='calculation-box'>", unsafe_allow_html=True)
         st.markdown(f"<p class='calculation-formula'>과세표준: {simple_format(current_tax_details['transferProfit'])} - 2,500,000 = {simple_format(current_tax_details['transferProfit']-2500000)}원</p>", unsafe_allow_html=True)
         
-        if current_tax_details['transferProfit']-2500000 <= 300000000:
-            st.markdown(f"<p class='calculation-formula'>{simple_format(current_tax_details['transferProfit']-2500000)} × 22% = {simple_format(current_tax_details['transferTax'])}원</p>", unsafe_allow_html=True)
+        taxable_gain = current_tax_details['transferProfit'] - 2500000
+        if taxable_gain <= 300000000:
+            st.markdown(f"<p class='calculation-formula'>{simple_format(taxable_gain)} × 22% = {simple_format(taxable_gain * 0.22)}원</p>", unsafe_allow_html=True)
         else:
             st.markdown(f"<p class='calculation-formula'>3억원 이하: 300,000,000 × 22% = {simple_format(300000000*0.22)}원</p>", unsafe_allow_html=True)
-            st.markdown(f"<p class='calculation-formula'>3억원 초과: {simple_format((current_tax_details['transferProfit']-2500000)-300000000)} × 27.5% = {simple_format(((current_tax_details['transferProfit']-2500000)-300000000)*0.275)}원</p>", unsafe_allow_html=True)
+            st.markdown(f"<p class='calculation-formula'>3억원 초과: {simple_format(taxable_gain-300000000)} × 27.5% = {simple_format((taxable_gain-300000000)*0.275)}원</p>", unsafe_allow_html=True)
             st.markdown(f"<p class='calculation-formula'>합계: {simple_format(current_tax_details['transferTax'])}원</p>", unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
     
-    # 세금 계산 방법 상세 - 청산소득세 (이미지 2의 하단 예제와 유사하게 구성)
+    # 청산소득세 계산 세부내역
     with st.expander("청산소득세 계산 세부내역"):
         st.markdown("<div class='calculation-box'>", unsafe_allow_html=True)
-        if current_tax_details['ownedValue'] <= 200000000:
-            st.markdown(f"<p class='calculation-formula'>법인세: 2억원 × 9% = {simple_format(current_tax_details['corporateTax'])}원</p>", unsafe_allow_html=True)
-        else:
-            st.markdown(f"<p class='calculation-formula'>법인세: 2억원 × 9% + ({simple_format(current_tax_details['ownedValue'] - 200000000)} × 19%) = {simple_format(current_tax_details['corporateTax'])}원</p>", unsafe_allow_html=True)
+        # 이 부분을 수정하여 조건문 오류 방지
+        owned_value = current_tax_details['ownedValue']
+        if owned_value <= 200000000:  # 2억 이하
+            corporate_tax = owned_value * 0.09  # 9%
+            st.markdown(f"<p class='calculation-formula'>법인세: {simple_format(owned_value)} × 9% = {simple_format(corporate_tax)}원</p>", unsafe_allow_html=True)
+        else:  # 2억 초과
+            corporate_tax = 200000000 * 0.09 + (owned_value - 200000000) * 0.19  # 2억 초과분 19%
+            st.markdown(f"<p class='calculation-formula'>법인세: 2억원 × 9% + ({simple_format(owned_value - 200000000)} × 19%) = {simple_format(corporate_tax)}원</p>", unsafe_allow_html=True)
         
-        st.markdown(f"<p class='calculation-formula'>배당소득세: ({simple_format(current_tax_details['ownedValue'])} - {simple_format(current_tax_details['corporateTax'])}) × 15.4% = {simple_format(current_tax_details['liquidationTax'])}원</p>", unsafe_allow_html=True)
-        st.markdown(f"<p class='calculation-formula'>총 세금: {simple_format(current_tax_details['corporateTax'])} + {simple_format(current_tax_details['liquidationTax'])} = {simple_format(current_tax_details['totalTax'])}원</p>", unsafe_allow_html=True)
+        after_tax = owned_value - corporate_tax
+        dividend_tax = after_tax * 0.154  # 15.4%
+        st.markdown(f"<p class='calculation-formula'>배당소득세: ({simple_format(owned_value)} - {simple_format(corporate_tax)}) × 15.4% = {simple_format(dividend_tax)}원</p>", unsafe_allow_html=True)
+        st.markdown(f"<p class='calculation-formula'>총 세금: {simple_format(corporate_tax)} + {simple_format(dividend_tax)} = {simple_format(corporate_tax + dividend_tax)}원</p>", unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
     
     # 세금 비교 분석 (이미지 1의 하단 섹션과 유사하게 구성)
@@ -452,11 +461,13 @@ else:
     sorted_taxes = sorted(taxes, key=lambda x: x["amount"])
     lowest_tax = sorted_taxes[0]["name"]
     
+    st.markdown("<ul>", unsafe_allow_html=True)
     for tax in sorted_taxes:
         if tax["name"] == lowest_tax:
             st.markdown(f"<li><b>{tax['name']}</b>는 <b>{simple_format(tax['amount'])}원</b>으로, 세금 부담이 가장 적습니다.</li>", unsafe_allow_html=True)
         else:
             st.markdown(f"<li>{tax['name']}는 {simple_format(tax['amount'])}원입니다.</li>", unsafe_allow_html=True)
+    st.markdown("</ul>", unsafe_allow_html=True)
     
     st.markdown("<p>상황에 따라 가장 유리한 방법을 선택하는 것이 중요합니다. 다음 사항을 고려하세요:</p>", unsafe_allow_html=True)
     st.markdown("<ul>", unsafe_allow_html=True)
