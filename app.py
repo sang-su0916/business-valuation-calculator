@@ -1,10 +1,9 @@
 import streamlit as st
 
 st.set_page_config(
-   page_title="기업가치 약식 평가계산기",
-   page_icon="💼",
-   layout="wide",
-   initial_sidebar_state="expanded"
+    page_title="기업가치 약식 평가계산기",
+    page_icon="💼",
+    layout="wide"
 )
 
 st.title("기업가치 약식 평가계산기")
