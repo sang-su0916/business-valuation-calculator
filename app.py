@@ -6,16 +6,27 @@ st.set_page_config(
     layout="wide"
 )
 
-# 사이드바 설정
-st.sidebar.title("메뉴")
-st.sidebar.info("""
-아래 페이지 목록에서 원하는 메뉴를 선택하세요:
-- 비상장주식 평가
-- 주식가치 결과
-- 현시점 세금계산
-- 미래 주식가치
-- 미래 세금계산
-""")
+# 페이지 이동 함수
+def navigate_to(page):
+    if page == "비상장주식 평가":
+        st.switch_page("1_비상장주식_평가.py")
+    elif page == "주식가치 결과":
+        st.switch_page("2_주식가치_결과.py")
+    elif page == "현시점 세금계산":
+        st.switch_page("3_현시점_세금계산.py")
+    elif page == "미래 주식가치":
+        st.switch_page("4_미래_주식가치.py")
+    elif page == "미래 세금계산":
+        st.switch_page("5_미래_세금계산.py")
+
+# 사이드바에 버튼 추가
+with st.sidebar:
+    st.title("메뉴")
+    st.button("비상장주식 평가", on_click=navigate_to, args=("비상장주식 평가",), use_container_width=True)
+    st.button("주식가치 결과", on_click=navigate_to, args=("주식가치 결과",), use_container_width=True)
+    st.button("현시점 세금계산", on_click=navigate_to, args=("현시점 세금계산",), use_container_width=True)
+    st.button("미래 주식가치", on_click=navigate_to, args=("미래 주식가치",), use_container_width=True)
+    st.button("미래 세금계산", on_click=navigate_to, args=("미래 세금계산",), use_container_width=True)
 
 # 메인 콘텐츠
 st.title("기업가치 약식 평가계산기")
@@ -41,4 +52,4 @@ st.markdown("""
 - 상속세 및 증여세법 시행령 제54조에 근거한 계산 방식을 사용합니다.
 """)
 
-st.info("왼쪽 사이드바에서 원하는 메뉴를 선택하세요.")
+st.info("왼쪽 사이드바의 버튼을 클릭하여 원하는 메뉴로 이동하세요.")
