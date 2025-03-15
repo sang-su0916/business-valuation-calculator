@@ -41,6 +41,14 @@ st.markdown("""
         background-color: #f8f9fa;
         border-radius: 4px;
     }
+    .sidebar-guide {
+        background-color: #e8f4f8;
+        padding: 10px 15px;
+        border-radius: 5px;
+        margin-top: 10px;
+        font-size: 0.9em;
+        border-left: 3px solid #4dabf7;
+    }
     .chart-container {
         margin-bottom: 20px;
     }
@@ -62,8 +70,7 @@ st.markdown("""
 # 결과 확인
 if not st.session_state.get('evaluated', False):
     st.warning("먼저 '비상장주식 평가' 페이지에서 평가를 진행해주세요.")
-    if st.button("비상장주식 평가 페이지로 이동"):
-        st.switch_page("1_비상장주식_평가.py")
+    st.markdown("<div class='sidebar-guide'>왼쪽 사이드바에서 <b>비상장주식 평가</b> 메뉴를 클릭하여 이동하세요.</div>", unsafe_allow_html=True)
 else:
     stock_value = st.session_state.stock_value
     company_name = st.session_state.company_name
@@ -163,12 +170,22 @@ else:
     col1, col2 = st.columns(2)
     with col1:
         if st.button("현시점 세금 계산하기", type="primary", use_container_width=True):
-            st.switch_page("3_현시점_세금계산.py")
+            # 버튼 클릭 시 페이지 전환을 시도하지만 실패할 경우를 대비해 안내 메시지 추가
+            st.markdown("<div class='sidebar-guide'>왼쪽 사이드바에서 <b>현시점 세금계산</b> 메뉴를 클릭하여 이동하세요.</div>", unsafe_allow_html=True)
+            try:
+                st.switch_page("3_현시점_세금계산.py")
+            except:
+                pass  # 오류 메시지 표시하지 않음
         st.markdown("<div class='button-description'>상속세, 증여세, 양도소득세 등 현시점 기준 세금을 계산합니다.</div>", unsafe_allow_html=True)
     
     with col2:
         if st.button("미래 주식가치 계산하기", type="primary", use_container_width=True):
-            st.switch_page("4_미래_주식가치.py")
+            # 사이드바 이동 안내 메시지
+            st.markdown("<div class='sidebar-guide'>왼쪽 사이드바에서 <b>미래 주식가치</b> 메뉴를 클릭하여 이동하세요.</div>", unsafe_allow_html=True)
+            try:
+                st.switch_page("4_미래_주식가치.py")
+            except:
+                pass  # 오류 메시지 표시하지 않음
         st.markdown("<div class='button-description'>회사의 성장을 고려하여 미래 시점의 주식가치를 예측합니다.</div>", unsafe_allow_html=True)
     
     # 추가 안내
