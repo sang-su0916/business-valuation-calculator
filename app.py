@@ -477,7 +477,7 @@ elif page == "3. 현시점 세금계산":
         col1, col2 = st.columns(2)
         with col1:
             if st.button("2. 주식가치 결과로 돌아가기", use_container_width=True):
-                st.experimental_rerun()
+                st.rerun()
         
         with col2:
-            if st.button("4. 미
+            if st.button("4. 미래 주식가치 계산하기", use_container_width=True):
