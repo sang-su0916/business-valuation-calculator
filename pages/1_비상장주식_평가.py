@@ -124,13 +124,13 @@ with st.expander("주주 정보", expanded=True):
         with col1:
             name = st.text_input(
                 f"주주 {i+1} 이름", 
-                value=st.session_state.shareholders[i]["name"],
+                value=st.session_state.shareholders[i]["name"] if i < len(st.session_state.shareholders) else "",
                 key=f"shareholder_name_{i}"
             )
         with col2:
             shares_owned = st.number_input(
                 f"보유 주식수", 
-                value=st.session_state.shareholders[i]["shares"], 
+                value=st.session_state.shareholders[i]["shares"] if i < len(st.session_state.shareholders) else 0, 
                 min_value=0,
                 max_value=shares,
                 format="%d",
@@ -166,10 +166,61 @@ with st.expander("평가 방식 선택", expanded=True):
     - **순자산가치만 평가**: 특수한 경우 (설립 1년 미만 등) (순자산가치 100%)
     """)
 
-# 비상장주식 가치 계산 함수 (이전과 동일)
+# 비상장주식 가치 계산 함수
 def calculate_stock_value():
-    # 기존 로직 유지
-    # ...
+    # 1. 순자산가치 계산
+    net_asset_per_share = total_equity / shares
+    
+    # 2. 영업권 계산
+    weighted_income = (net_income1 * 3 + net_income2 * 2 + net_income3 * 1) / 6
+    weighted_income_per_share = weighted_income / shares
+    weighted_income_per_share_50 = weighted_income_per_share * 0.5
+    equity_return = (total_equity * (interest_rate / 100)) / shares
+    annuity_factor = 3.7908
+    goodwill = max(0, (weighted_income_per_share_50 - equity_return) * annuity_factor)
+    
+    # 3. 순자산가치 + 영업권
+    asset_value_with_goodwill = net_asset_per_share + goodwill
+    
+    # 4. 손익가치 계산
+    income_value = weighted_income_per_share * (100 / interest_rate)
+    
+    # 5. 최종가치 계산
+    if evaluation_method == "부동산 과다법인":
+        # 부동산 과다법인
+        stock_value = (asset_value_with_goodwill * 0.6) + (income_value * 0.4)
+        net_asset_80_percent = net_asset_per_share * 0.8
+        final_value = max(stock_value, net_asset_80_percent)
+        method_text = '부동산 과다법인: (자산가치×0.6 + 수익가치×0.4)'
+    elif evaluation_method == "순자산가치만 평가":
+        # 순자산가치만 적용
+        final_value = net_asset_per_share
+        method_text = '순자산가치만 평가'
+    else:
+        # 일반법인
+        stock_value = (income_value * 0.6) + (asset_value_with_goodwill * 0.4)
+        net_asset_80_percent = net_asset_per_share * 0.8
+        final_value = max(stock_value, net_asset_80_percent)
+        method_text = '일반법인: (수익가치×0.6 + 자산가치×0.4)'
+    
+    # 총 가치
+    total_value = final_value * shares
+    owned_value = final_value * owned_shares
+    
+    # 증가율 계산
+    increase_percentage = round((final_value / net_asset_per_share) * 100)
+    
+    return {
+        "netAssetPerShare": net_asset_per_share,
+        "assetValueWithGoodwill": asset_value_with_goodwill,
+        "incomeValue": income_value,
+        "finalValue": final_value,
+        "totalValue": total_value,
+        "ownedValue": owned_value,
+        "methodText": method_text,
+        "increasePercentage": increase_percentage,
+        "weightedIncome": weighted_income
+    }
 
 # 계산 버튼
 if st.button("비상장주식 평가하기", type="primary", use_container_width=True):
