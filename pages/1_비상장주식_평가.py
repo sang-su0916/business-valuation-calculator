@@ -17,13 +17,19 @@ import base64
 import re
 import json
 
-# FPDF 라이브러리 추가 (PDF 생성용) - 경고 메시지 제거
+# FPDF 라이브러리 추가 (PDF 생성용)
 try:
     from fpdf import FPDF
     FPDF_AVAILABLE = True
 except ImportError:
-    FPDF_AVAILABLE = False
-    # 경고 메시지 제거
+    try:
+        # pip으로 설치 시도
+        import subprocess
+        subprocess.check_call(['pip', 'install', 'fpdf'])
+        from fpdf import FPDF
+        FPDF_AVAILABLE = True
+    except:
+        FPDF_AVAILABLE = False
 
 # 파일 처리 라이브러리
 try:
@@ -325,8 +331,14 @@ def apply_extracted_data(extracted_data):
 # PDF 생성 함수
 def generate_pdf():
     if not FPDF_AVAILABLE:
-        # 오류 메시지 제거하고 None 반환
-        return None
+        # FPDF를 자동으로 설치 시도
+        try:
+            import subprocess
+            subprocess.check_call(['pip', 'install', 'fpdf'])
+            global FPDF_AVAILABLE
+            FPDF_AVAILABLE = True
+        except:
+            return None
     
     try:
         # PDF 객체 생성
@@ -383,9 +395,32 @@ def generate_pdf():
             pdf.cell(190, 10, f'Final Value per Share: {format_number(st.session_state.stock_value["finalValue"])} KRW', 0, 1)
             pdf.cell(190, 10, f'Total Company Value: {format_number(st.session_state.stock_value["totalValue"], True)} KRW', 0, 1)
         
-        # PDF를 바이트로 변환
-        pdf_output = pdf.output(dest='S').encode('latin-1')
-        return pdf_output
+        # PDF를 바이트로 변환 (안전한 방법 사용)
+        try:
+            # 방법 1: FPDF 기본 방식
+            pdf_output = pdf.output(dest='S').encode('latin-1')
+            return pdf_output
+        except Exception as e1:
+            try:
+                # 방법 2: 파일에 저장 후 읽기
+                import tempfile
+                import os
+                with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp:
+                    temp_path = tmp.name
+                
+                pdf.output(temp_path)
+                with open(temp_path, 'rb') as f:
+                    pdf_bytes = f.read()
+                
+                # 임시 파일 삭제
+                try:
+                    os.unlink(temp_path)
+                except:
+                    pass
+                
+                return pdf_bytes
+            except Exception as e2:
+                return None
     
     except Exception as e:
         # 디버깅용 오류 출력
@@ -877,28 +912,42 @@ if st.session_state.evaluated and st.session_state.stock_value:
         tab1, tab2, tab3 = st.tabs(["PDF", "HTML", "CSV"])
         
         with tab1:
-            # PDF 다운로드 섹션 수정 - 직접 다운로드 버튼 표시
-            pdf_data = generate_pdf()
-            if pdf_data:
-                st.download_button(
-                    label="📄 PDF 파일 다운로드",
-                    data=pdf_data,
-                    file_name=f"비상장주식_평가_{st.session_state.company_name}_{st.session_state.eval_date}.pdf",
-                    mime="application/pdf"
-                )
-            else:
-                if st.button("PDF 다시 생성하기", key="regenerate_pdf"):
-                    with st.spinner("PDF 생성 중..."):
-                        pdf_data = generate_pdf()
-                        if pdf_data:
+            # PDF 다운로드 버튼 직접 표시하기
+            if st.button("PDF 생성하기", key="generate_pdf", type="primary"):
+                with st.spinner("PDF 생성 중..."):
+                    pdf_data = generate_pdf()
+                    if pdf_data:
+                        st.success("PDF 생성 완료! 아래 버튼을 클릭하여 다운로드하세요.")
+                        st.download_button(
+                            label="📄 PDF 파일 다운로드",
+                            data=pdf_data,
+                            file_name=f"비상장주식_평가_{st.session_state.company_name}_{st.session_state.eval_date}.pdf",
+                            mime="application/pdf"
+                        )
+                    else:
+                        # 대체 PDF 생성 시도 (fpdf2 사용)
+                        try:
+                            import subprocess
+                            subprocess.check_call(['pip', 'install', 'fpdf2'])
+                            from fpdf import FPDF as FPDF2
+                            
+                            st.info("대체 방법으로 PDF 생성을 시도합니다...")
+                            pdf = FPDF2()
+                            pdf.add_page()
+                            pdf.set_font('Helvetica', 'B', 16)
+                            pdf.cell(40, 10, '비상장주식 평가 결과')
+                            pdf_bytes = pdf.output()
+                            
+                            st.success("PDF 생성 완료! 아래 버튼을 클릭하여 다운로드하세요.")
                             st.download_button(
-                                label="📄 PDF 파일 다운로드",
-                                data=pdf_data,
-                                file_name=f"비상장주식_평가_{st.session_state.company_name}_{st.session_state.eval_date}.pdf",
+                                label="📄 PDF 파일 다운로드 (기본 형식)",
+                                data=pdf_bytes,
+                                file_name=f"비상장주식_평가_{st.session_state.company_name}_{st.session_state.eval_date}_기본.pdf",
                                 mime="application/pdf"
                             )
-                        else:
-                            st.info("PDF 생성 중 오류가 발생했습니다. FPDF 라이브러리가 설치되어 있는지 확인하거나 HTML 형식으로 다운로드해보세요.")
+                        except:
+                            st.error("PDF 생성에 실패했습니다. HTML 형식으로 다운로드해보세요.")
+                            st.info("또는 'pip install fpdf fpdf2' 명령으로 필요한 라이브러리를 설치해보세요.")
         
         with tab2:
             if st.button("HTML 파일 생성하기", key="generate_html"):
