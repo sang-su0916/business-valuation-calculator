@@ -1,7 +1,10 @@
-# 코드 끝부분에 다운로드 기능 추가하기
-# 참고사항 밑에 추가하세요 (약 394줄 근처)
-
-    # 다운로드 섹션 추가
+# 참고사항 아래에 추가할 코드 (들여쓰기 수정 버전)
+    # 참고사항
+    st.markdown("<div class='warning-box'>", unsafe_allow_html=True)
+    st.markdown("※ 이 계산기의 세금 계산은 참고용으로만 사용하시기 바랍니다. 실제 세금은 개인 상황, 보유기간, 대주주 여부, 사업 형태 등에 따라 달라질 수 있습니다.", unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
+    
+    # 다운로드 섹션 추가 - 들여쓰기 유지
     st.subheader("📥 세금 계산 결과 다운로드")
     
     # HTML 보고서 다운로드 버튼
