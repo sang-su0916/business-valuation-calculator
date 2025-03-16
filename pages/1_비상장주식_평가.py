@@ -1,15 +1,23 @@
 import streamlit as st
+
+# 페이지 설정 - 반드시 첫 번째 Streamlit 명령어로 위치해야 함
+st.set_page_config(
+    page_title="비상장주식 평가",
+    page_icon="📊",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
 import pandas as pd
 import numpy as np
-import datetime
+import locale
+from datetime import datetime
 import io
 import base64
-from PIL import Image
 import re
 import json
-import os
 
-# FPDF 라이브러리 추가
+# FPDF 라이브러리 추가 (PDF 생성용)
 try:
     from fpdf import FPDF
     FPDF_AVAILABLE = True
@@ -31,77 +39,115 @@ except ImportError:
     PYPDF2_AVAILABLE = False
 
 try:
-    import xlsx
+    import openpyxl
     XLSX_AVAILABLE = True
 except ImportError:
-    try:
-        import openpyxl
-        XLSX_AVAILABLE = True
-    except ImportError:
-        XLSX_AVAILABLE = False
+    XLSX_AVAILABLE = False
 
-# 페이지 설정
-st.set_page_config(
-    page_title="비상장주식 평가",
-    page_icon="📊",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+# 숫자 형식화를 위한 로케일 설정
+try:
+    locale.setlocale(locale.LC_ALL, 'ko_KR.UTF-8')
+except:
+    try:
+        locale.setlocale(locale.LC_ALL, 'ko_KR')
+    except:
+        locale.setlocale(locale.LC_ALL, '')
+
+# 페이지 스타일링
+st.markdown("""
+<style>
+    .main .block-container {
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+        max-width: 1000px;
+    }
+    .stNumberInput input {
+        font-weight: bold;
+    }
+    .stExpander {
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        margin-bottom: 1rem;
+    }
+    .amount-display {
+        color: #0066cc;
+        font-weight: bold;
+        padding: 5px 0;
+    }
+    .field-description {
+        color: #666;
+        font-style: italic;
+        font-size: 0.85rem;
+        margin-top: 0.2rem;
+        margin-bottom: 0.5rem;
+    }
+    .section-header {
+        font-weight: bold;
+        font-size: 1.1rem;
+        margin-bottom: 0.5rem;
+        color: #333;
+    }
+    .upload-section {
+        background-color: #f8f9fa;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 15px;
+    }
+    .download-section {
+        background-color: #f0f7fb;
+        padding: 15px;
+        border-radius: 8px;
+        margin-top: 20px;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 # 세션 상태 초기화
+if 'eval_date' not in st.session_state:
+    st.session_state.eval_date = datetime.now().date()
 if 'company_name' not in st.session_state:
-    st.session_state.company_name = ""
-if 'total_capital' not in st.session_state:
-    st.session_state.total_capital = 1000000000
-if 'profit_1' not in st.session_state:
-    st.session_state.profit_1 = 386650000
-if 'profit_2' not in st.session_state:
-    st.session_state.profit_2 = 163401000
-if 'profit_3' not in st.session_state:
-    st.session_state.profit_3 = 75794000
-if 'shares_total' not in st.session_state:
-    st.session_state.shares_total = 4000
-if 'face_value' not in st.session_state:
-    st.session_state.face_value = 5000
-if 'capitalization_rate' not in st.session_state:
-    st.session_state.capitalization_rate = 10.0  # 환원율 10%로 고정
+    st.session_state.company_name = "주식회사 에이비씨"
+if 'total_equity' not in st.session_state:
+    st.session_state.total_equity = 1000000000
+if 'net_income1' not in st.session_state:
+    st.session_state.net_income1 = 386650000
+if 'net_income2' not in st.session_state:
+    st.session_state.net_income2 = 163401000
+if 'net_income3' not in st.session_state:
+    st.session_state.net_income3 = 75794000
+if 'shares' not in st.session_state:
+    st.session_state.shares = 4000
+if 'owned_shares' not in st.session_state:
+    st.session_state.owned_shares = 2000
+if 'share_price' not in st.session_state:
+    st.session_state.share_price = 5000
+if 'interest_rate' not in st.session_state:
+    st.session_state.interest_rate = 10  # 환원율 10%로 고정
+if 'evaluation_method' not in st.session_state:
+    st.session_state.evaluation_method = "일반법인"
+if 'stock_value' not in st.session_state:
+    st.session_state.stock_value = None
+if 'evaluated' not in st.session_state:
+    st.session_state.evaluated = False
+if 'shareholders' not in st.session_state:
+    st.session_state.shareholders = [
+        {"name": "대표이사", "shares": 2000},
+        {"name": "", "shares": 0},
+        {"name": "", "shares": 0},
+        {"name": "", "shares": 0},
+        {"name": "", "shares": 0}
+    ]
 if 'shareholder_count' not in st.session_state:
     st.session_state.shareholder_count = 1
-if 'evaluation_date' not in st.session_state:
-    st.session_state.evaluation_date = datetime.date.today()
 
-# 사이드바 메뉴
-st.sidebar.title("app")
-st.sidebar.page_link("비상장주식 평가", label="비상장주식 평가", icon="📊")
-st.sidebar.page_link("주식가치 결과", label="주식가치 결과", icon="📈")
-st.sidebar.page_link("현시점 세금계산", label="현시점 세금계산", icon="💰")
-st.sidebar.page_link("미래 주식가치", label="미래 주식가치", icon="🔮")
-st.sidebar.page_link("미래 세금계산", label="미래 세금계산", icon="💸")
-
-# 숫자 포맷팅 함수
+# 숫자 형식화 함수
 def format_number(num):
-    if num is None:
-        return "0"
-    return f"{int(num):,}"
+    try:
+        return "{:,}".format(int(num))
+    except:
+        return str(num)
 
-# 추출한 데이터를 세션 상태에 적용하는 함수
-def apply_extracted_data(extracted_data):
-    if 'company_name' in extracted_data and extracted_data['company_name']:
-        st.session_state.company_name = extracted_data['company_name']
-    if 'total_capital' in extracted_data and extracted_data['total_capital']:
-        st.session_state.total_capital = extracted_data['total_capital']
-    if 'profit_1' in extracted_data and extracted_data['profit_1']:
-        st.session_state.profit_1 = extracted_data['profit_1']
-    if 'profit_2' in extracted_data and extracted_data['profit_2']:
-        st.session_state.profit_2 = extracted_data['profit_2']
-    if 'profit_3' in extracted_data and extracted_data['profit_3']:
-        st.session_state.profit_3 = extracted_data['profit_3']
-    if 'shares_total' in extracted_data and extracted_data['shares_total']:
-        st.session_state.shares_total = extracted_data['shares_total']
-    if 'face_value' in extracted_data and extracted_data['face_value']:
-        st.session_state.face_value = extracted_data['face_value']
-
-# 정규식 패턴
+# 정규식 패턴으로 데이터 찾기
 def find_with_patterns(text, patterns):
     for pattern in patterns:
         matches = re.findall(pattern, text, re.IGNORECASE)
@@ -123,7 +169,7 @@ def extract_data_from_file(uploaded_file):
     # 텍스트 추출
     text_content = ""
     
-    # 1. Excel 파일 처리
+    # Excel 파일 처리
     if file_ext in ['xlsx', 'xls'] and XLSX_AVAILABLE:
         try:
             df = pd.read_excel(uploaded_file)
@@ -139,40 +185,40 @@ def extract_data_from_file(uploaded_file):
                             extracted_data['company_name'] = val
                             break
                 
-                if '자본' in col_lower or 'capital' in col_lower:
+                if '자본' in col_lower or 'capital' in col_lower or 'equity' in col_lower:
                     for idx, val in df[col].items():
                         if isinstance(val, (int, float)) and val > 0:
-                            extracted_data['total_capital'] = int(val)
+                            extracted_data['total_equity'] = int(val)
                             break
                 
-                if '당기순이익' in col_lower or 'profit' in col_lower:
+                if '당기순이익' in col_lower or 'profit' in col_lower or 'income' in col_lower:
                     profit_values = [val for idx, val in df[col].items() 
                                     if isinstance(val, (int, float)) and val > 0]
                     if len(profit_values) >= 3:
-                        extracted_data['profit_1'] = int(profit_values[0])
-                        extracted_data['profit_2'] = int(profit_values[1])
-                        extracted_data['profit_3'] = int(profit_values[2])
+                        extracted_data['net_income1'] = int(profit_values[0])
+                        extracted_data['net_income2'] = int(profit_values[1])
+                        extracted_data['net_income3'] = int(profit_values[2])
                     elif len(profit_values) == 2:
-                        extracted_data['profit_1'] = int(profit_values[0])
-                        extracted_data['profit_2'] = int(profit_values[1])
+                        extracted_data['net_income1'] = int(profit_values[0])
+                        extracted_data['net_income2'] = int(profit_values[1])
                     elif len(profit_values) == 1:
-                        extracted_data['profit_1'] = int(profit_values[0])
+                        extracted_data['net_income1'] = int(profit_values[0])
                 
                 if '주식' in col_lower or 'shares' in col_lower:
                     for idx, val in df[col].items():
                         if isinstance(val, (int, float)) and val > 0:
-                            extracted_data['shares_total'] = int(val)
+                            extracted_data['shares'] = int(val)
                             break
                 
                 if '액면' in col_lower or 'face' in col_lower:
                     for idx, val in df[col].items():
                         if isinstance(val, (int, float)) and val > 0:
-                            extracted_data['face_value'] = int(val)
+                            extracted_data['share_price'] = int(val)
                             break
         except Exception as e:
             st.error(f"엑셀 파일 처리 중 오류가 발생했습니다: {str(e)}")
     
-    # 2. Word 파일 처리
+    # Word 파일 처리
     elif file_ext in ['docx', 'doc'] and DOCX_AVAILABLE:
         try:
             doc = docx.Document(uploaded_file)
@@ -181,13 +227,13 @@ def extract_data_from_file(uploaded_file):
         except Exception as e:
             st.error(f"워드 파일 처리 중 오류가 발생했습니다: {str(e)}")
     
-    # 3. PDF 파일 처리
+    # PDF 파일 처리
     elif file_ext == 'pdf' and PYPDF2_AVAILABLE:
         try:
-            pdf_reader = PyPDF2.PdfFileReader(uploaded_file)
+            reader = PyPDF2.PdfReader(uploaded_file)
             text_content = ""
-            for page_num in range(pdf_reader.numPages):
-                text_content += pdf_reader.getPage(page_num).extractText()
+            for page in reader.pages:
+                text_content += page.extract_text()
         except Exception as e:
             st.error(f"PDF 파일 처리 중 오류가 발생했습니다: {str(e)}")
     
@@ -210,15 +256,17 @@ def extract_data_from_file(uploaded_file):
             r'자본총계\s*[:\s]+([\d,\.]+)',
             r'자본\s*[:\s]+([\d,\.]+)',
             r'총자본\s*[:\s]+([\d,\.]+)',
-            r'capital\s*[:\s]+([\d,\.]+)'
+            r'capital\s*[:\s]+([\d,\.]+)',
+            r'equity\s*[:\s]+([\d,\.]+)'
         ]
-        extracted_data['total_capital'] = find_with_patterns(text_content, capital_patterns)
+        extracted_data['total_equity'] = find_with_patterns(text_content, capital_patterns)
         
         # 당기순이익 패턴
         profit_patterns = [
             r'당기순이익\s*[:\s]+([\d,\.]+)',
             r'순이익\s*[:\s]+([\d,\.]+)',
-            r'profit\s*[:\s]+([\d,\.]+)'
+            r'profit\s*[:\s]+([\d,\.]+)',
+            r'net income\s*[:\s]+([\d,\.]+)'
         ]
         profit_matches = []
         for pattern in profit_patterns:
@@ -226,14 +274,14 @@ def extract_data_from_file(uploaded_file):
             profit_matches.extend(matches)
         
         if len(profit_matches) >= 3:
-            extracted_data['profit_1'] = int(re.sub(r'[^\d]', '', profit_matches[0]))
-            extracted_data['profit_2'] = int(re.sub(r'[^\d]', '', profit_matches[1]))
-            extracted_data['profit_3'] = int(re.sub(r'[^\d]', '', profit_matches[2]))
+            extracted_data['net_income1'] = int(re.sub(r'[^\d]', '', profit_matches[0]))
+            extracted_data['net_income2'] = int(re.sub(r'[^\d]', '', profit_matches[1]))
+            extracted_data['net_income3'] = int(re.sub(r'[^\d]', '', profit_matches[2]))
         elif len(profit_matches) == 2:
-            extracted_data['profit_1'] = int(re.sub(r'[^\d]', '', profit_matches[0]))
-            extracted_data['profit_2'] = int(re.sub(r'[^\d]', '', profit_matches[1]))
+            extracted_data['net_income1'] = int(re.sub(r'[^\d]', '', profit_matches[0]))
+            extracted_data['net_income2'] = int(re.sub(r'[^\d]', '', profit_matches[1]))
         elif len(profit_matches) == 1:
-            extracted_data['profit_1'] = int(re.sub(r'[^\d]', '', profit_matches[0]))
+            extracted_data['net_income1'] = int(re.sub(r'[^\d]', '', profit_matches[0]))
         
         # 주식수 패턴
         shares_patterns = [
@@ -241,7 +289,7 @@ def extract_data_from_file(uploaded_file):
             r'주식수\s*[:\s]+([\d,\.]+)',
             r'shares\s*[:\s]+([\d,\.]+)'
         ]
-        extracted_data['shares_total'] = find_with_patterns(text_content, shares_patterns)
+        extracted_data['shares'] = find_with_patterns(text_content, shares_patterns)
         
         # 액면가 패턴
         face_value_patterns = [
@@ -249,9 +297,26 @@ def extract_data_from_file(uploaded_file):
             r'액면금액\s*[:\s]+([\d,\.]+)',
             r'face value\s*[:\s]+([\d,\.]+)'
         ]
-        extracted_data['face_value'] = find_with_patterns(text_content, face_value_patterns)
+        extracted_data['share_price'] = find_with_patterns(text_content, face_value_patterns)
     
     return extracted_data
+
+# 추출한 데이터를 세션 상태에 적용하는 함수
+def apply_extracted_data(extracted_data):
+    if 'company_name' in extracted_data and extracted_data['company_name']:
+        st.session_state.company_name = extracted_data['company_name']
+    if 'total_equity' in extracted_data and extracted_data['total_equity']:
+        st.session_state.total_equity = extracted_data['total_equity']
+    if 'net_income1' in extracted_data and extracted_data['net_income1']:
+        st.session_state.net_income1 = extracted_data['net_income1']
+    if 'net_income2' in extracted_data and extracted_data['net_income2']:
+        st.session_state.net_income2 = extracted_data['net_income2']
+    if 'net_income3' in extracted_data and extracted_data['net_income3']:
+        st.session_state.net_income3 = extracted_data['net_income3']
+    if 'shares' in extracted_data and extracted_data['shares']:
+        st.session_state.shares = extracted_data['shares']
+    if 'share_price' in extracted_data and extracted_data['share_price']:
+        st.session_state.share_price = extracted_data['share_price']
 
 # PDF 생성 함수
 def generate_pdf():
@@ -264,75 +329,55 @@ def generate_pdf():
         pdf = FPDF()
         pdf.add_page()
         
-        # 기본 폰트 사용 (한글 대신 기본 폰트)
+        # 기본 폰트 사용 (한글은 표시되지 않을 수 있음)
         pdf.set_font('Arial', 'B', 16)
         
         # 제목
-        pdf.cell(190, 10, '비상장주식 가치평가 보고서', 0, 1, 'C')
+        pdf.cell(190, 10, 'Unlisted Stock Valuation Report', 0, 1, 'C')
         pdf.ln(10)
         
         # 기본 폰트 설정
         pdf.set_font('Arial', '', 12)
         
         # 평가 정보
-        pdf.cell(190, 10, f'평가 기준일: {st.session_state.evaluation_date}', 0, 1)
-        pdf.cell(190, 10, f'회사명: {st.session_state.company_name}', 0, 1)
+        pdf.cell(190, 10, f'Date: {st.session_state.eval_date}', 0, 1)
+        pdf.cell(190, 10, f'Company: {st.session_state.company_name}', 0, 1)
         pdf.ln(5)
         
         # 재무 정보
         pdf.set_font('Arial', 'B', 14)
-        pdf.cell(190, 10, '재무 정보', 0, 1)
+        pdf.cell(190, 10, 'Financial Information', 0, 1)
         pdf.set_font('Arial', '', 12)
-        pdf.cell(190, 10, f'자본총계: {format_number(st.session_state.total_capital)}원', 0, 1)
-        pdf.cell(190, 10, f'1년 전 당기순이익: {format_number(st.session_state.profit_1)}원 (가중치 3배)', 0, 1)
-        pdf.cell(190, 10, f'2년 전 당기순이익: {format_number(st.session_state.profit_2)}원 (가중치 2배)', 0, 1)
-        pdf.cell(190, 10, f'3년 전 당기순이익: {format_number(st.session_state.profit_3)}원 (가중치 1배)', 0, 1)
+        pdf.cell(190, 10, f'Total Equity: {format_number(st.session_state.total_equity)} KRW', 0, 1)
+        pdf.cell(190, 10, f'Net Income (Year 1): {format_number(st.session_state.net_income1)} KRW (Weight 3)', 0, 1)
+        pdf.cell(190, 10, f'Net Income (Year 2): {format_number(st.session_state.net_income2)} KRW (Weight 2)', 0, 1)
+        pdf.cell(190, 10, f'Net Income (Year 3): {format_number(st.session_state.net_income3)} KRW (Weight 1)', 0, 1)
         pdf.ln(5)
         
         # 주식 정보
         pdf.set_font('Arial', 'B', 14)
-        pdf.cell(190, 10, '주식 정보', 0, 1)
+        pdf.cell(190, 10, 'Stock Information', 0, 1)
         pdf.set_font('Arial', '', 12)
-        pdf.cell(190, 10, f'총 발행주식수: {format_number(st.session_state.shares_total)}주', 0, 1)
-        pdf.cell(190, 10, f'액면금액: {format_number(st.session_state.face_value)}원', 0, 1)
-        pdf.cell(190, 10, f'환원율: {st.session_state.capitalization_rate}%', 0, 1)
+        pdf.cell(190, 10, f'Total Shares: {format_number(st.session_state.shares)}', 0, 1)
+        pdf.cell(190, 10, f'Face Value: {format_number(st.session_state.share_price)} KRW', 0, 1)
+        pdf.cell(190, 10, f'Capitalization Rate: {st.session_state.interest_rate}%', 0, 1)
         pdf.ln(5)
         
         # 평가 결과
-        pdf.set_font('Arial', 'B', 14)
-        pdf.cell(190, 10, '평가 결과', 0, 1)
-        pdf.set_font('Arial', '', 12)
-        
-        # 수익가치
-        weighted_profit = (st.session_state.profit_1 * 3 + 
-                          st.session_state.profit_2 * 2 + 
-                          st.session_state.profit_1 * 1) / 6
-        income_value = weighted_profit / (st.session_state.capitalization_rate / 100)
-        income_value_per_share = income_value / st.session_state.shares_total
-        
-        # 자산가치
-        asset_value = st.session_state.total_capital
-        asset_value_per_share = asset_value / st.session_state.shares_total
-        
-        # 일반법인 평가액
-        normal_value = income_value * 0.6 + asset_value * 0.4
-        normal_value_per_share = normal_value / st.session_state.shares_total
-        
-        # 부동산 과다법인 평가액
-        real_estate_value = income_value * 0.4 + asset_value * 0.6
-        real_estate_value_per_share = real_estate_value / st.session_state.shares_total
-        
-        # 순자산가치 평가액
-        net_asset_value = asset_value
-        net_asset_value_per_share = net_asset_value / st.session_state.shares_total
-        
-        pdf.cell(190, 10, f'수익가치: {format_number(income_value)}원 (주당 {format_number(income_value_per_share)}원)', 0, 1)
-        pdf.cell(190, 10, f'자산가치: {format_number(asset_value)}원 (주당 {format_number(asset_value_per_share)}원)', 0, 1)
-        pdf.ln(5)
-        
-        pdf.cell(190, 10, f'일반법인 평가액: {format_number(normal_value)}원 (주당 {format_number(normal_value_per_share)}원)', 0, 1)
-        pdf.cell(190, 10, f'부동산 과다법인 평가액: {format_number(real_estate_value)}원 (주당 {format_number(real_estate_value_per_share)}원)', 0, 1)
-        pdf.cell(190, 10, f'순자산가치 평가액: {format_number(net_asset_value)}원 (주당 {format_number(net_asset_value_per_share)}원)', 0, 1)
+        if st.session_state.stock_value:
+            pdf.set_font('Arial', 'B', 14)
+            pdf.cell(190, 10, 'Valuation Results', 0, 1)
+            pdf.set_font('Arial', '', 12)
+            
+            pdf.cell(190, 10, f'Net Asset Value per Share: {format_number(st.session_state.stock_value["netAssetPerShare"])} KRW', 0, 1)
+            pdf.cell(190, 10, f'Income Value per Share: {format_number(st.session_state.stock_value["incomeValue"])} KRW', 0, 1)
+            pdf.cell(190, 10, f'Asset Value with Goodwill: {format_number(st.session_state.stock_value["assetValueWithGoodwill"])} KRW', 0, 1)
+            pdf.ln(5)
+            
+            pdf.set_font('Arial', 'B', 12)
+            pdf.cell(190, 10, f'Valuation Method: {st.session_state.stock_value["methodText"]}', 0, 1)
+            pdf.cell(190, 10, f'Final Value per Share: {format_number(st.session_state.stock_value["finalValue"])} KRW', 0, 1)
+            pdf.cell(190, 10, f'Total Company Value: {format_number(st.session_state.stock_value["totalValue"])} KRW', 0, 1)
         
         # PDF를 바이트로 변환
         pdf_output = pdf.output(dest='S').encode('latin-1')
@@ -344,29 +389,6 @@ def generate_pdf():
 
 # HTML 다운로드용 내용 생성
 def create_html_content():
-    # 수익가치
-    weighted_profit = (st.session_state.profit_1 * 3 + 
-                      st.session_state.profit_2 * 2 + 
-                      st.session_state.profit_1 * 1) / 6
-    income_value = weighted_profit / (st.session_state.capitalization_rate / 100)
-    income_value_per_share = income_value / st.session_state.shares_total
-    
-    # 자산가치
-    asset_value = st.session_state.total_capital
-    asset_value_per_share = asset_value / st.session_state.shares_total
-    
-    # 일반법인 평가액
-    normal_value = income_value * 0.6 + asset_value * 0.4
-    normal_value_per_share = normal_value / st.session_state.shares_total
-    
-    # 부동산 과다법인 평가액
-    real_estate_value = income_value * 0.4 + asset_value * 0.6
-    real_estate_value_per_share = real_estate_value / st.session_state.shares_total
-    
-    # 순자산가치 평가액
-    net_asset_value = asset_value
-    net_asset_value_per_share = net_asset_value / st.session_state.shares_total
-    
     html_content = f"""
     <!DOCTYPE html>
     <html>
@@ -385,27 +407,33 @@ def create_html_content():
         <h1>비상장주식 가치평가 보고서</h1>
         
         <h2>평가 정보</h2>
-        <div class="info">평가 기준일: {st.session_state.evaluation_date}</div>
+        <div class="info">평가 기준일: {st.session_state.eval_date}</div>
         <div class="info">회사명: {st.session_state.company_name}</div>
         
         <h2>재무 정보</h2>
-        <div class="info">자본총계: {format_number(st.session_state.total_capital)}원</div>
-        <div class="info">1년 전 당기순이익: {format_number(st.session_state.profit_1)}원 (가중치 3배)</div>
-        <div class="info">2년 전 당기순이익: {format_number(st.session_state.profit_2)}원 (가중치 2배)</div>
-        <div class="info">3년 전 당기순이익: {format_number(st.session_state.profit_3)}원 (가중치 1배)</div>
+        <div class="info">자본총계: {format_number(st.session_state.total_equity)}원</div>
+        <div class="info">1년 전 당기순이익: {format_number(st.session_state.net_income1)}원 (가중치 3배)</div>
+        <div class="info">2년 전 당기순이익: {format_number(st.session_state.net_income2)}원 (가중치 2배)</div>
+        <div class="info">3년 전 당기순이익: {format_number(st.session_state.net_income3)}원 (가중치 1배)</div>
         
         <h2>주식 정보</h2>
-        <div class="info">총 발행주식수: {format_number(st.session_state.shares_total)}주</div>
-        <div class="info">액면금액: {format_number(st.session_state.face_value)}원</div>
-        <div class="info">환원율: {st.session_state.capitalization_rate}%</div>
-        
+        <div class="info">총 발행주식수: {format_number(st.session_state.shares)}주</div>
+        <div class="info">액면금액: {format_number(st.session_state.share_price)}원</div>
+        <div class="info">환원율: {st.session_state.interest_rate}%</div>
+    """
+    
+    if st.session_state.stock_value:
+        html_content += f"""
         <h2>평가 결과</h2>
-        <div class="info">수익가치: {format_number(income_value)}원 (주당 {format_number(income_value_per_share)}원)</div>
-        <div class="info">자산가치: {format_number(asset_value)}원 (주당 {format_number(asset_value_per_share)}원)</div>
+        <div class="info">순자산가치: {format_number(st.session_state.stock_value["netAssetPerShare"])}원</div>
+        <div class="info">수익가치: {format_number(st.session_state.stock_value["incomeValue"])}원</div>
         
-        <div class="result">일반법인 평가액: {format_number(normal_value)}원 (주당 {format_number(normal_value_per_share)}원)</div>
-        <div class="result">부동산 과다법인 평가액: {format_number(real_estate_value)}원 (주당 {format_number(real_estate_value_per_share)}원)</div>
-        <div class="result">순자산가치 평가액: {format_number(net_asset_value)}원 (주당 {format_number(net_asset_value_per_share)}원)</div>
+        <div class="result">평가방법: {st.session_state.stock_value["methodText"]}</div>
+        <div class="result">주당 평가액: {format_number(st.session_state.stock_value["finalValue"])}원</div>
+        <div class="result">기업 총 가치: {format_number(st.session_state.stock_value["totalValue"])}원</div>
+        """
+    
+    html_content += """
     </body>
     </html>
     """
@@ -413,43 +441,24 @@ def create_html_content():
 
 # CSV 다운로드용 내용 생성
 def create_csv_content():
-    # 수익가치
-    weighted_profit = (st.session_state.profit_1 * 3 + 
-                      st.session_state.profit_2 * 2 + 
-                      st.session_state.profit_1 * 1) / 6
-    income_value = weighted_profit / (st.session_state.capitalization_rate / 100)
-    income_value_per_share = income_value / st.session_state.shares_total
-    
-    # 자산가치
-    asset_value = st.session_state.total_capital
-    asset_value_per_share = asset_value / st.session_state.shares_total
-    
-    # 일반법인 평가액
-    normal_value = income_value * 0.6 + asset_value * 0.4
-    normal_value_per_share = normal_value / st.session_state.shares_total
-    
-    # 부동산 과다법인 평가액
-    real_estate_value = income_value * 0.4 + asset_value * 0.6
-    real_estate_value_per_share = real_estate_value / st.session_state.shares_total
-    
-    # 순자산가치 평가액
-    net_asset_value = asset_value
-    net_asset_value_per_share = net_asset_value / st.session_state.shares_total
+    if not st.session_state.stock_value:
+        return None
     
     # CSV 데이터 생성
     data = {
         '항목': ['평가 기준일', '회사명', '자본총계', '1년 전 당기순이익', '2년 전 당기순이익', '3년 전 당기순이익',
-                '총 발행주식수', '액면금액', '환원율', '수익가치', '자산가치', '일반법인 평가액',
-                '부동산 과다법인 평가액', '순자산가치 평가액'],
-        '값': [st.session_state.evaluation_date, st.session_state.company_name,
-              st.session_state.total_capital, st.session_state.profit_1,
-              st.session_state.profit_2, st.session_state.profit_3,
-              st.session_state.shares_total, st.session_state.face_value,
-              st.session_state.capitalization_rate, income_value,
-              asset_value, normal_value, real_estate_value, net_asset_value],
-        '주당 가치': ['', '', '', '', '', '', '', '', '', income_value_per_share,
-                  asset_value_per_share, normal_value_per_share,
-                  real_estate_value_per_share, net_asset_value_per_share]
+                '총 발행주식수', '액면금액', '환원율', '순자산가치', '수익가치', 
+                '평가 방법', '주당 평가액', '기업 총 가치'],
+        '값': [str(st.session_state.eval_date), st.session_state.company_name,
+              st.session_state.total_equity, st.session_state.net_income1,
+              st.session_state.net_income2, st.session_state.net_income3,
+              st.session_state.shares, st.session_state.share_price,
+              st.session_state.interest_rate, 
+              st.session_state.stock_value["netAssetPerShare"],
+              st.session_state.stock_value["incomeValue"],
+              st.session_state.stock_value["methodText"],
+              st.session_state.stock_value["finalValue"],
+              st.session_state.stock_value["totalValue"]]
     }
     
     # DataFrame 생성 후 CSV로 변환
@@ -457,287 +466,450 @@ def create_csv_content():
     csv = df.to_csv(index=False).encode('utf-8')
     return csv
 
-# 메인 애플리케이션
-st.title("비상장주식 평가")
+# 비상장주식 가치 계산 함수
+def calculate_stock_value():
+    # 입력값 가져오기
+    total_equity = st.session_state.total_equity
+    net_income1 = st.session_state.net_income1
+    net_income2 = st.session_state.net_income2
+    net_income3 = st.session_state.net_income3
+    shares = st.session_state.shares
+    owned_shares = st.session_state.owned_shares
+    interest_rate = st.session_state.interest_rate
+    evaluation_method = st.session_state.evaluation_method
+    eval_date = st.session_state.eval_date
+    
+    # 계산 로직
+    net_asset_per_share = total_equity / shares
+    weighted_income = (net_income1 * 3 + net_income2 * 2 + net_income3 * 1) / 6
+    weighted_income_per_share = weighted_income / shares
+    weighted_income_per_share_50 = weighted_income_per_share * 0.5
+    equity_return = (total_equity * (interest_rate / 100)) / shares
+    annuity_factor = 3.7908
+    goodwill = max(0, (weighted_income_per_share_50 - equity_return) * annuity_factor)
+    asset_value_with_goodwill = net_asset_per_share + goodwill
+    income_value = weighted_income_per_share * (100 / interest_rate)
+    
+    if evaluation_method == "부동산 과다법인":
+        stock_value = (asset_value_with_goodwill * 0.6) + (income_value * 0.4)
+        net_asset_80_percent = net_asset_per_share * 0.8
+        final_value = max(stock_value, net_asset_80_percent)
+        method_text = '부동산 과다법인: (자산가치×0.6 + 수익가치×0.4)'
+    elif evaluation_method == "순자산가치만 평가":
+        final_value = net_asset_per_share
+        method_text = '순자산가치만 평가'
+    else:
+        stock_value = (income_value * 0.6) + (asset_value_with_goodwill * 0.4)
+        net_asset_80_percent = net_asset_per_share * 0.8
+        final_value = max(stock_value, net_asset_80_percent)
+        method_text = '일반법인: (수익가치×0.6 + 자산가치×0.4)'
+    
+    total_value = final_value * shares
+    owned_value = final_value * owned_shares
+    increase_percentage = round((final_value / net_asset_per_share) * 100) if net_asset_per_share > 0 else 0
+    
+    return {
+        "evalDate": eval_date,
+        "netAssetPerShare": net_asset_per_share,
+        "assetValueWithGoodwill": asset_value_with_goodwill,
+        "incomeValue": income_value,
+        "finalValue": final_value,
+        "totalValue": total_value,
+        "ownedValue": owned_value,
+        "methodText": method_text,
+        "increasePercentage": increase_percentage,
+        "weightedIncome": weighted_income
+    }
 
-# 날짜 선택
-col1, col2 = st.columns([3, 1])
-with col2:
-    evaluation_date = st.date_input(
-        "평가 기준일",
-        st.session_state.evaluation_date,
-        format="YYYY/MM/DD"
-    )
-    st.session_state.evaluation_date = evaluation_date
+# 페이지 헤더
+st.title("비상장주식 가치평가")
 
 # 파일 업로드 섹션 (expander로 숨김)
-with st.expander("파일 업로드 (엑셀, PDF, 워드)"):
+with st.expander("📤 파일 업로드 (엑셀, PDF, 워드)", expanded=False):
+    st.markdown("<div class='upload-section'>", unsafe_allow_html=True)
     uploaded_file = st.file_uploader("재무정보가 포함된 파일을 업로드하세요", 
                                     type=['xlsx', 'xls', 'pdf', 'docx', 'doc'])
     
     if uploaded_file is not None:
-        file_details = {"파일명": uploaded_file.name, "파일크기": uploaded_file.size}
-        st.write(file_details)
+        st.write(f"파일명: {uploaded_file.name}, 파일크기: {uploaded_file.size} bytes")
         
         # 데이터 추출 버튼
-        if st.button("데이터 추출"):
+        if st.button("📥 데이터 추출", key="extract_data"):
             with st.spinner('파일에서 데이터를 추출 중입니다...'):
                 extracted_data = extract_data_from_file(uploaded_file)
                 
                 # 추출된 데이터 표시
                 if extracted_data:
-                    extracted_items = []
-                    if 'company_name' in extracted_data:
-                        extracted_items.append(f"회사명: {extracted_data['company_name']}")
-                    if 'total_capital' in extracted_data:
-                        extracted_items.append(f"자본총계: {format_number(extracted_data['total_capital'])}원")
-                    if 'profit_1' in extracted_data:
-                        extracted_items.append(f"1년 전 당기순이익: {format_number(extracted_data['profit_1'])}원")
-                    if 'profit_2' in extracted_data:
-                        extracted_items.append(f"2년 전 당기순이익: {format_number(extracted_data['profit_2'])}원")
-                    if 'profit_3' in extracted_data:
-                        extracted_items.append(f"3년 전 당기순이익: {format_number(extracted_data['profit_3'])}원")
-                    if 'shares_total' in extracted_data:
-                        extracted_items.append(f"총 발행주식수: {format_number(extracted_data['shares_total'])}주")
-                    if 'face_value' in extracted_data:
-                        extracted_items.append(f"액면금액: {format_number(extracted_data['face_value'])}원")
+                    st.success("다음 데이터가 추출되었습니다:")
                     
-                    if extracted_items:
-                        st.success("다음 데이터가 추출되었습니다:")
-                        for item in extracted_items:
-                            st.write(item)
-                        
-                        # 데이터 적용 버튼
-                        if st.button("추출된 데이터 적용"):
-                            apply_extracted_data(extracted_data)
-                            st.success("데이터가 적용되었습니다.")
-                    else:
-                        st.warning("파일에서 추출 가능한 데이터를 찾지 못했습니다.")
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if 'company_name' in extracted_data:
+                            st.write(f"회사명: {extracted_data['company_name']}")
+                        if 'total_equity' in extracted_data:
+                            st.write(f"자본총계: {format_number(extracted_data['total_equity'])}원")
+                        if 'shares' in extracted_data:
+                            st.write(f"총 발행주식수: {format_number(extracted_data['shares'])}주")
+                    
+                    with col2:
+                        if 'net_income1' in extracted_data:
+                            st.write(f"1년 전 당기순이익: {format_number(extracted_data['net_income1'])}원")
+                        if 'net_income2' in extracted_data:
+                            st.write(f"2년 전 당기순이익: {format_number(extracted_data['net_income2'])}원")
+                        if 'net_income3' in extracted_data:
+                            st.write(f"3년 전 당기순이익: {format_number(extracted_data['net_income3'])}원")
+                        if 'share_price' in extracted_data:
+                            st.write(f"액면금액: {format_number(extracted_data['share_price'])}원")
+                    
+                    # 데이터 적용 버튼
+                    if st.button("💾 추출된 데이터 적용", key="apply_data"):
+                        apply_extracted_data(extracted_data)
+                        st.success("데이터가 적용되었습니다.")
+                        st.experimental_rerun()
                 else:
-                    st.warning("파일에서 데이터를 추출하지 못했습니다.")
+                    st.warning("파일에서 추출 가능한 데이터를 찾지 못했습니다.")
+    st.markdown("</div>", unsafe_allow_html=True)
+
+# 평가 기준일 설정
+with st.expander("평가 기준일", expanded=True):
+    col1, col2 = st.columns([1, 2])
+    
+    with col1:
+        eval_date = st.date_input(
+            "평가 기준일",
+            value=st.session_state.eval_date,
+            help="비상장주식 평가의 기준이 되는 날짜입니다. 보통 결산일이나 평가가 필요한 시점으로 설정합니다.",
+            key="eval_date_input"
+        )
+    
+    with col2:
+        st.markdown("<div class='field-description'>평가 기준일은 자본총계, 당기순이익 등 재무정보의 기준 시점입니다. 일반적으로 가장 최근 결산일을 사용합니다.</div>", unsafe_allow_html=True)
 
 # 회사 정보 입력
 with st.expander("회사 정보", expanded=True):
-    col1, col2 = st.columns([1, 3])
-    with col1:
-        st.write("회사명")
-    with col2:
-        company_name = st.text_input("회사명", value=st.session_state.company_name, label_visibility="collapsed")
-        st.session_state.company_name = company_name
+    col1, col2 = st.columns([1, 1])
     
-    col1, col2, col3, col4 = st.columns([1, 3, 1, 1])
     with col1:
-        st.write("자본총계 (원)")
-    with col2:
-        total_capital = st.number_input("자본총계 (원)", 
-                                      value=st.session_state.total_capital,
-                                      step=1000000,
-                                      label_visibility="collapsed")
-        st.session_state.total_capital = total_capital
-    with col3:
-        st.button("-", key="decrease_capital", help="자본총계 감소")
-    with col4:
-        st.button("+", key="increase_capital", help="자본총계 증가")
+        st.markdown("<div class='section-header'>회사명</div>", unsafe_allow_html=True)
+        company_name = st.text_input(
+            "회사명", 
+            value=st.session_state.company_name,
+            help="평가 대상 회사의 정식 명칭을 입력하세요.",
+            key="company_name_input",
+            label_visibility="collapsed"
+        )
+        # 회사명 설명 제거함
     
-    # 자본총계 포맷팅 표시
-    st.write(f"금액: {format_number(total_capital)}원")
-    st.write("재무상태표(대차대조표)상의 자본총계 금액입니다. 평가기준일 현재의 금액을 입력하세요.")
+    with col2:
+        st.markdown("<div class='section-header'>자본총계 (원)</div>", unsafe_allow_html=True)
+        total_equity = st.number_input(
+            "자본총계 (원)", 
+            value=st.session_state.total_equity, 
+            min_value=0, 
+            format="%d",
+            help="평가 기준일 현재 회사의 대차대조표상 자본총계를 입력하세요.",
+            key="total_equity_input",
+            label_visibility="collapsed"
+        )
+        st.markdown(f"<div class='amount-display'>금액: {format_number(total_equity)}원</div>", unsafe_allow_html=True)
+        st.markdown("<div class='field-description'>재무상태표(대차대조표)상의 자본총계 금액입니다. 평가기준일 현재의 금액을 입력하세요.</div>", unsafe_allow_html=True)
 
-# 당기순이익 정보 입력
+# 당기순이익 입력
 with st.expander("당기순이익 (최근 3개년)", expanded=True):
-    st.write("최근 3개 사업연도의 당기순이익을 입력하세요. 각 연도별로 가중치가 다르게 적용됩니다.")
+    st.markdown("<div class='field-description'>최근 3개 사업연도의 당기순이익을 입력하세요. 각 연도별로 가중치가 다르게 적용됩니다.</div>", unsafe_allow_html=True)
     
-    # 1년 전 (가중치 3배)
-    col1, col2, col3, col4 = st.columns([1, 3, 1, 1])
+    col1, col2, col3 = st.columns(3)
+    
     with col1:
-        st.write("1년 전 (가중치 3배)")
+        st.markdown("##### 1년 전 (가중치 3배)")
+        net_income1 = st.number_input(
+            "당기순이익 (원)", 
+            value=st.session_state.net_income1, 
+            format="%d",
+            help="가장 최근 연도의 당기순이익입니다. 3배 가중치가 적용됩니다.",
+            key="income_year1_input",
+            label_visibility="collapsed"
+        )
+        st.markdown(f"<div class='amount-display'>금액: {format_number(net_income1)}원</div>", unsafe_allow_html=True)
+        # 설명 제거함
+        
     with col2:
-        profit_1 = st.number_input("1년 전 당기순이익", 
-                                  value=st.session_state.profit_1,
-                                  step=1000000,
-                                  label_visibility="collapsed")
-        st.session_state.profit_1 = profit_1
+        st.markdown("##### 2년 전 (가중치 2배)")
+        net_income2 = st.number_input(
+            "당기순이익 (원)", 
+            value=st.session_state.net_income2, 
+            format="%d",
+            help="2년 전 당기순이익입니다. 2배 가중치가 적용됩니다.",
+            key="income_year2_input",
+            label_visibility="collapsed"
+        )
+        st.markdown(f"<div class='amount-display'>금액: {format_number(net_income2)}원</div>", unsafe_allow_html=True)
+        # 설명 제거함
+        
     with col3:
-        st.button("-", key="decrease_profit_1")
-    with col4:
-        st.button("+", key="increase_profit_1")
-    
-    st.write(f"금액: {format_number(profit_1)}원")
-    
-    # 2년 전 (가중치 2배)
-    col1, col2, col3, col4 = st.columns([1, 3, 1, 1])
-    with col1:
-        st.write("2년 전 (가중치 2배)")
-    with col2:
-        profit_2 = st.number_input("2년 전 당기순이익", 
-                                  value=st.session_state.profit_2,
-                                  step=1000000,
-                                  label_visibility="collapsed")
-        st.session_state.profit_2 = profit_2
-    with col3:
-        st.button("-", key="decrease_profit_2")
-    with col4:
-        st.button("+", key="increase_profit_2")
-    
-    st.write(f"금액: {format_number(profit_2)}원")
-    
-    # 3년 전 (가중치 1배)
-    col1, col2, col3, col4 = st.columns([1, 3, 1, 1])
-    with col1:
-        st.write("3년 전 (가중치 1배)")
-    with col2:
-        profit_3 = st.number_input("3년 전 당기순이익", 
-                                  value=st.session_state.profit_3,
-                                  step=1000000,
-                                  label_visibility="collapsed")
-        st.session_state.profit_3 = profit_3
-    with col3:
-        st.button("-", key="decrease_profit_3")
-    with col4:
-        st.button("+", key="increase_profit_3")
-    
-    st.write(f"금액: {format_number(profit_3)}원")
+        st.markdown("##### 3년 전 (가중치 1배)")
+        net_income3 = st.number_input(
+            "당기순이익 (원)", 
+            value=st.session_state.net_income3, 
+            format="%d",
+            help="3년 전 당기순이익입니다. 1배 가중치가 적용됩니다.",
+            key="income_year3_input",
+            label_visibility="collapsed"
+        )
+        st.markdown(f"<div class='amount-display'>금액: {format_number(net_income3)}원</div>", unsafe_allow_html=True)
+        # 설명 제거함
 
 # 주식 정보 입력
 with st.expander("주식 정보", expanded=True):
-    # 총 발행주식수
-    col1, col2, col3, col4 = st.columns([1, 3, 1, 1])
+    col1, col2, col3 = st.columns([1, 1, 1])
+    
     with col1:
-        st.write("총 발행주식수")
+        st.markdown("<div class='section-header'>총 발행주식수</div>", unsafe_allow_html=True)
+        shares = st.number_input(
+            "총 발행주식수", 
+            value=st.session_state.shares, 
+            min_value=1, 
+            format="%d",
+            help="회사가 발행한 총 주식수입니다.",
+            key="shares_input",
+            label_visibility="collapsed"
+        )
+        st.markdown(f"<div class='amount-display'>총 {format_number(shares)}주</div>", unsafe_allow_html=True)
+        # 설명 제거함
+        
     with col2:
-        shares_total = st.number_input("총 발행주식수", 
-                                     value=st.session_state.shares_total,
-                                     step=100,
-                                     label_visibility="collapsed")
-        st.session_state.shares_total = shares_total
+        st.markdown("<div class='section-header'>액면금액 (원)</div>", unsafe_allow_html=True)
+        share_price = st.number_input(
+            "액면금액 (원)", 
+            value=st.session_state.share_price, 
+            min_value=0, 
+            format="%d",
+            help="주식 1주당 액면가액입니다. 일반적으로 100원, 500원, 1,000원, 5,000원 등으로 설정됩니다.",
+            key="share_price_input",
+            label_visibility="collapsed"
+        )
+        st.markdown(f"<div class='amount-display'>금액: {format_number(share_price)}원</div>", unsafe_allow_html=True)
+        # 설명 제거함
+        
     with col3:
-        st.button("-", key="decrease_shares")
-    with col4:
-        st.button("+", key="increase_shares")
-    
-    st.write(f"총 {format_number(shares_total)}주")
-    
-    # 액면금액
-    col1, col2, col3, col4 = st.columns([1, 3, 1, 1])
-    with col1:
-        st.write("액면금액 (원)")
-    with col2:
-        face_value = st.number_input("액면금액 (원)", 
-                                   value=st.session_state.face_value,
-                                   step=500,
-                                   label_visibility="collapsed")
-        st.session_state.face_value = face_value
-    with col3:
-        st.button("-", key="decrease_face_value")
-    with col4:
-        st.button("+", key="increase_face_value")
-    
-    st.write(f"금액: {format_number(face_value)}원")
-    
-    # 환원율 (10%로 고정)
-    col1, col2 = st.columns([1, 3])
-    with col1:
-        st.write("환원율 (%)")
-    with col2:
-        # 고정된 환원율 표시
-        st.slider("환원율 (%)", min_value=1, max_value=20, value=int(st.session_state.capitalization_rate), 
-                step=1, disabled=True, label_visibility="collapsed")
-    
-    st.write("수익가치 평가 시 사용되는 환원율입니다. 일반적으로 10%를 적용합니다.")
+        st.markdown("<div class='section-header'>환원율 (%)</div>", unsafe_allow_html=True)
+        # 환원율 10%로 고정 (슬라이더는 표시하되 비활성화)
+        interest_rate = st.slider(
+            "환원율 (%)", 
+            min_value=1, 
+            max_value=20, 
+            value=10,  # 고정 값
+            key="interest_rate_slider", 
+            help="수익가치 평가에 사용되는 환원율입니다. 일반적으로 시장금리를 반영하여 10%를 사용합니다.",
+            label_visibility="collapsed",
+            disabled=True  # 슬라이더 비활성화
+        )
+        st.markdown("<div class='field-description'>수익가치 평가 시 사용되는 할인율입니다. 환원율은 10%로 고정되어 있습니다.</div>", unsafe_allow_html=True)
 
 # 주주 정보 입력
 with st.expander("주주 정보", expanded=True):
-    col1, col2, col3 = st.columns([1, 3, 1])
+    col1, col2 = st.columns([2, 2])
+    
     with col1:
-        st.write("입력할 주주 수")
+        shareholder_count = st.selectbox(
+            "입력할 주주 수",
+            options=[1, 2, 3, 4, 5],
+            index=st.session_state.shareholder_count - 1,
+            key="shareholder_count_select",
+            help="입력할 주주의 수를 선택하세요. 최대 5명까지 입력 가능합니다."
+        )
+    
+    st.session_state.shareholder_count = shareholder_count
+    
+    st.markdown("<div style='margin:10px 0; padding:10px; background-color:#f0f7fb; border-radius:5px; font-weight:bold;'>"
+                f"주주 정보를 입력하세요 (선택된 주주 수: {shareholder_count}명)"
+                "</div>", unsafe_allow_html=True)
+    
+    st.markdown("<div class='field-description'>회사의 주주 정보를 입력하세요. 주주별 보유 주식수는 발행주식 총수를 초과할 수 없습니다.</div>", unsafe_allow_html=True)
+    
+    # 총 주식수 확인을 위한 변수
+    total_owned_shares = 0
+    
+    # 선택한 수만큼의 주주 정보 입력
+    shareholders = []
+    for i in range(shareholder_count):
+        col1, col2 = st.columns([1, 1])
+        with col1:
+            name = st.text_input(
+                f"주주 {i+1} 이름", 
+                value=st.session_state.shareholders[i]["name"] if i < len(st.session_state.shareholders) else "",
+                key=f"shareholder_name_input_{i}",
+                help=f"주주 {i+1}의 이름을 입력하세요."
+            )
+        
+        with col2:
+            shares_owned = st.number_input(
+                f"보유 주식수", 
+                value=st.session_state.shareholders[i]["shares"] if i < len(st.session_state.shareholders) else 0, 
+                min_value=0,
+                max_value=shares,
+                format="%d",
+                key=f"shareholder_shares_input_{i}",
+                help=f"주주 {i+1}의 보유 주식수를 입력하세요."
+            )
+            st.markdown(f"<div class='amount-display'>{format_number(shares_owned)}주</div>", unsafe_allow_html=True)
+        
+        # 구분선 추가
+        if i < shareholder_count - 1:
+            st.markdown("<hr style='margin:10px 0; border-color:#eee;'>", unsafe_allow_html=True)
+        
+        shareholders.append({"name": name, "shares": shares_owned})
+        total_owned_shares += shares_owned
+    
+    # 나머지 주주 정보 보존
+    for i in range(shareholder_count, 5):
+        if i < len(st.session_state.shareholders):
+            shareholders.append(st.session_state.shareholders[i])
+        else:
+            shareholders.append({"name": "", "shares": 0})
+    
+    # 입력된 주식수 합계 확인
+    ownership_percent = round(total_owned_shares/shares*100, 2) if shares > 0 else 0
+    
+    st.markdown(f"""
+    <div style='margin-top:15px; padding:10px; border-radius:5px; 
+         background-color:{"#e6f3e6" if total_owned_shares <= shares else "#f8d7da"}; 
+         color:{"#0c5460" if total_owned_shares <= shares else "#721c24"};
+         font-weight:bold;'>
+        {'✅' if total_owned_shares <= shares else '⚠️'} 
+        주주들의 총 보유 주식수: {format_number(total_owned_shares)}주 
+        (발행주식수의 {ownership_percent}%)
+        {' ※ 발행주식수를 초과했습니다.' if total_owned_shares > shares else ''}
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # 대표이사 보유 주식수 설정
+    owned_shares = shareholders[0]["shares"] if shareholders and shareholders[0]["name"] else 0
+
+# 평가 방식 선택
+with st.expander("평가 방식 선택", expanded=True):
+    st.markdown("<div class='section-header'>비상장주식 평가 방법</div>", unsafe_allow_html=True)
+    evaluation_method = st.selectbox(
+        "비상장주식 평가 방법",
+        ("일반법인", "부동산 과다법인", "순자산가치만 평가"),
+        index=["일반법인", "부동산 과다법인", "순자산가치만 평가"].index(st.session_state.evaluation_method),
+        key="evaluation_method_select",
+        help="상속세 및 증여세법 시행령 제54조에 근거한 평가 방법을 선택하세요.",
+        label_visibility="collapsed"
+    )
+    
+    st.markdown("""
+    <div style='background-color:#f0f7fb; padding:15px; border-radius:5px; margin-top:15px;'>
+    <span style='font-weight:bold; font-size:16px;'>📌 평가방식 설명</span>
+    <ul style='margin-top:10px; margin-bottom:0; padding-left:20px;'>
+        <li><strong>일반법인</strong>: 대부분의 법인에 적용 (수익가치 60% + 자산가치 40%)</li>
+        <li><strong>부동산 과다법인</strong>: 부동산이 자산의 50% 이상인 법인 (자산가치 60% + 수익가치 40%)</li>
+        <li><strong>순자산가치만 평가</strong>: 특수한 경우 (설립 1년 미만 등) (순자산가치 100%)</li>
+    </ul>
+    </div>
+    """, unsafe_allow_html=True)
+    st.markdown("<div class='field-description'>상속세 및 증여세법 시행령 제54조에 근거한 평가방법입니다. 회사의 특성에 맞는 방법을 선택하세요.</div>", unsafe_allow_html=True)
+
+# 계산 버튼
+st.markdown("<div style='height:30px'></div>", unsafe_allow_html=True)
+
+if st.button("비상장주식 평가하기", type="primary", use_container_width=True, key="evaluate_button"):
+    with st.spinner("계산 중..."):
+        # 세션 상태 업데이트
+        st.session_state.eval_date = eval_date
+        st.session_state.company_name = company_name
+        st.session_state.total_equity = total_equity
+        st.session_state.net_income1 = net_income1
+        st.session_state.net_income2 = net_income2
+        st.session_state.net_income3 = net_income3
+        st.session_state.shares = shares
+        st.session_state.owned_shares = owned_shares
+        st.session_state.share_price = share_price
+        st.session_state.interest_rate = interest_rate  # 환원율 10% 고정
+        st.session_state.evaluation_method = evaluation_method
+        st.session_state.shareholders = shareholders
+        
+        # 주식 가치 계산
+        st.session_state.stock_value = calculate_stock_value()
+        st.session_state.evaluated = True
+        
+        st.success(f"✅ 계산이 완료되었습니다. 평가기준일: {eval_date.strftime('%Y년 %m월 %d일')} 기준")
+        st.balloons()
+
+# 결과 표시
+if st.session_state.evaluated and st.session_state.stock_value:
+    st.markdown("<hr>", unsafe_allow_html=True)
+    st.subheader("평가 결과")
+    
+    # 결과 데이터
+    stock_value = st.session_state.stock_value
+    
+    # 3열 레이아웃
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.markdown("##### 순자산가치")
+        st.markdown(f"<div style='font-size:20px; font-weight:bold;'>{format_number(stock_value['netAssetPerShare'])}원/주</div>", unsafe_allow_html=True)
+        st.markdown(f"총 {format_number(stock_value['netAssetPerShare'] * shares)}원")
+    
     with col2:
-        shareholder_count = st.selectbox("입력할 주주 수", 
-                                       options=list(range(1, 11)),
-                                       index=st.session_state.shareholder_count-1,
-                                       label_visibility="collapsed")
-        st.session_state.shareholder_count = shareholder_count
-
-# 결과 계산
-weighted_profit = (st.session_state.profit_1 * 3 + 
-                  st.session_state.profit_2 * 2 + 
-                  st.session_state.profit_3 * 1) / 6
-income_value = weighted_profit / (st.session_state.capitalization_rate / 100)
-income_value_per_share = income_value / st.session_state.shares_total
-
-asset_value = st.session_state.total_capital
-asset_value_per_share = asset_value / st.session_state.shares_total
-
-normal_value = income_value * 0.6 + asset_value * 0.4
-normal_value_per_share = normal_value / st.session_state.shares_total
-
-real_estate_value = income_value * 0.4 + asset_value * 0.6
-real_estate_value_per_share = real_estate_value / st.session_state.shares_total
-
-net_asset_value = asset_value
-net_asset_value_per_share = net_asset_value / st.session_state.shares_total
-
-# 평가 결과 표시
-st.divider()
-st.subheader("평가 결과")
-
-col1, col2 = st.columns(2)
-with col1:
-    st.write("수익가치")
-    st.write(f"{format_number(income_value)}원")
-    st.write(f"주당 {format_number(income_value_per_share)}원")
-with col2:
-    st.write("자산가치")
-    st.write(f"{format_number(asset_value)}원")
-    st.write(f"주당 {format_number(asset_value_per_share)}원")
-
-st.divider()
-st.write("평가방법별 주식가치")
-
-col1, col2, col3 = st.columns(3)
-with col1:
-    st.write("일반법인 (수익가치 60% + 자산가치 40%)")
-    st.write(f"{format_number(normal_value)}원")
-    st.write(f"주당 {format_number(normal_value_per_share)}원")
-with col2:
-    st.write("부동산 과다법인 (자산가치 60% + 수익가치 40%)")
-    st.write(f"{format_number(real_estate_value)}원")
-    st.write(f"주당 {format_number(real_estate_value_per_share)}원")
-with col3:
-    st.write("순자산가치만 평가 (순자산가치 100%)")
-    st.write(f"{format_number(net_asset_value)}원")
-    st.write(f"주당 {format_number(net_asset_value_per_share)}원")
-
-# 다운로드 섹션 (expander로 숨김)
-with st.expander("평가 결과 다운로드"):
-    tab1, tab2, tab3 = st.tabs(["PDF", "HTML", "CSV"])
+        st.markdown("##### 수익가치")
+        st.markdown(f"<div style='font-size:20px; font-weight:bold;'>{format_number(stock_value['incomeValue'])}원/주</div>", unsafe_allow_html=True)
+        st.markdown(f"총 {format_number(stock_value['incomeValue'] * shares)}원")
     
-    with tab1:
-        if st.button("PDF 형식으로 다운로드"):
-            pdf_data = generate_pdf()
-            if pdf_data:
+    with col3:
+        st.markdown("##### 최종 평가액")
+        st.markdown(f"<div style='font-size:24px; font-weight:bold; color:#0066cc;'>{format_number(stock_value['finalValue'])}원/주</div>", unsafe_allow_html=True)
+        st.markdown(f"총 {format_number(stock_value['totalValue'])}원")
+    
+    # 평가 방법 설명
+    st.markdown(f"""
+    <div style='margin-top:20px; padding:15px; background-color:#f8f9fa; border-radius:8px;'>
+    <h5>적용된 평가 방식: {stock_value['methodText']}</h5>
+    <p>최종 평가액은 자본총계 {format_number(total_equity)}원을 기준으로 계산되었으며, 
+    가중평균 당기순이익 {format_number(stock_value['weightedIncome'])}원과 
+    환원율 {interest_rate}%를 적용하여 산출되었습니다.</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # 다운로드 섹션
+    with st.expander("📥 평가 결과 다운로드", expanded=False):
+        st.markdown("<div class='download-section'>", unsafe_allow_html=True)
+        tab1, tab2, tab3 = st.tabs(["PDF", "HTML", "CSV"])
+        
+        with tab1:
+            if FPDF_AVAILABLE:
+                if st.button("PDF 생성하기", key="generate_pdf"):
+                    pdf_data = generate_pdf()
+                    if pdf_data:
+                        st.download_button(
+                            label="📄 PDF 파일 다운로드",
+                            data=pdf_data,
+                            file_name=f"비상장주식_평가_{st.session_state.company_name}_{st.session_state.eval_date}.pdf",
+                            mime="application/pdf"
+                        )
+            else:
+                st.warning("PDF 생성을 위한 FPDF 라이브러리가 설치되어 있지 않습니다.")
+                st.info("터미널에서 'pip install fpdf' 명령어로 설치할 수 있습니다.")
+        
+        with tab2:
+            if st.button("HTML 파일 생성하기", key="generate_html"):
+                html_content = create_html_content()
                 st.download_button(
-                    label="📄 PDF 파일 다운로드",
-                    data=pdf_data,
-                    file_name=f"비상장주식_평가_{st.session_state.company_name}_{st.session_state.evaluation_date}.pdf",
-                    mime="application/pdf"
+                    label="📄 HTML 파일 다운로드",
+                    data=html_content,
+                    file_name=f"비상장주식_평가_{st.session_state.company_name}_{st.session_state.eval_date}.html",
+                    mime="text/html"
                 )
-    
-    with tab2:
-        if st.button("HTML 형식으로 다운로드"):
-            html_content = create_html_content()
-            st.download_button(
-                label="📄 HTML 파일 다운로드",
-                data=html_content,
-                file_name=f"비상장주식_평가_{st.session_state.company_name}_{st.session_state.evaluation_date}.html",
-                mime="text/html"
-            )
-    
-    with tab3:
-        if st.button("CSV 형식으로 다운로드"):
-            csv_content = create_csv_content()
-            st.download_button(
-                label="📄 CSV 파일 다운로드",
-                data=csv_content,
-                file_name=f"비상장주식_평가_{st.session_state.company_name}_{st.session_state.evaluation_date}.csv",
-                mime="text/csv"
-            )
+        
+        with tab3:
+            if st.button("CSV 파일 생성하기", key="generate_csv"):
+                csv_content = create_csv_content()
+                if csv_content:
+                    st.download_button(
+                        label="📄 CSV 파일 다운로드",
+                        data=csv_content,
+                        file_name=f"비상장주식_평가_{st.session_state.company_name}_{st.session_state.eval_date}.csv",
+                        mime="text/csv"
+                    )
+        st.markdown("</div>", unsafe_allow_html=True)
