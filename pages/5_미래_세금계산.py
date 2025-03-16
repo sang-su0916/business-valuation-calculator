@@ -31,26 +31,35 @@ st.markdown("""
         padding: 20px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         margin: 15px 0;
+        text-align: center;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
     }
     .tax-title {
         font-size: 22px;
         font-weight: 600;
         margin-bottom: 15px;
+        text-align: center;
     }
     .tax-amount {
-        font-size: 26px;
-        font-weight: 600;
+        font-size: 24px;
+        font-weight: 500;
         margin: 10px 0;
+        text-align: center;
     }
     .tax-rate {
         color: #28a745;
         font-weight: 500;
         margin-bottom: 10px;
+        text-align: center;
     }
     .tax-description {
         color: #555;
         font-size: 0.95em;
         margin: 10px 0;
+        text-align: left;
     }
     .sidebar-guide {
         background-color: #e8f4f8;
@@ -546,7 +555,7 @@ else:
     # 증여세 카드
     with col1:
         st.markdown("<div class='tax-card'>", unsafe_allow_html=True)
-        st.markdown("<h3>증여세</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 class='tax-title'>증여세</h3>", unsafe_allow_html=True)
         st.markdown(f"<div class='tax-amount'>{simple_format(future_inheritance_tax)}원</div>", unsafe_allow_html=True)
         st.markdown(f"<div class='tax-rate'>적용 세율: 누진세율 (10%~50%)</div>", unsafe_allow_html=True)
         st.markdown("<div class='tax-description'>주식을 타인에게 무상으로 증여할 경우 발생하는 세금입니다. 증여 받은 사람이 납부합니다.</div>", unsafe_allow_html=True)
@@ -555,7 +564,7 @@ else:
     # 양도소득세 카드
     with col2:
         st.markdown("<div class='tax-card'>", unsafe_allow_html=True)
-        st.markdown("<h3>양도소득세</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 class='tax-title'>양도소득세</h3>", unsafe_allow_html=True)
         st.markdown(f"<div class='tax-amount'>{simple_format(future_transfer_tax)}원</div>", unsafe_allow_html=True)
         st.markdown(f"<div class='tax-rate'>적용 세율: 3억 이하 22%, 초과 27.5%</div>", unsafe_allow_html=True)
         st.markdown("<div class='tax-description'>주식을 매각하여 발생한 이익(양도차익)에 대해 부과되는 세금입니다. 기본공제 250만원이 적용됩니다.</div>", unsafe_allow_html=True)
@@ -564,7 +573,7 @@ else:
     # 청산소득세 카드
     with col3:
         st.markdown("<div class='tax-card'>", unsafe_allow_html=True)
-        st.markdown("<h3>청산소득세</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 class='tax-title'>청산소득세</h3>", unsafe_allow_html=True)
         st.markdown(f"<div class='tax-amount'>{simple_format(future_liquidation_tax)}원</div>", unsafe_allow_html=True)
         if is_family_corp:
             st.markdown(f"<div class='tax-rate'>법인세(19~24%) + 배당세 15.4%</div>", unsafe_allow_html=True)
