@@ -237,7 +237,7 @@ def generate_pdf(tax_details, company_name, owned_shares, share_price, eval_date
         pdf.cell(65, 10, f'Effective Rate: {tax_details["inheritanceRate"]:.1f}%', 0, 1)
         
         # 양도소득세
-        pdf.cell(60, 10, 'Capital Gains Tax:', 0, 0)
+        pdf.cell(60, 10, 'Capital Gains Tax (incl. Local Tax):', 0, 0)
         pdf.cell(65, 10, f'{simple_format(tax_details["transferTax"])} KRW', 0, 0)
         pdf.cell(65, 10, f'Effective Rate: {tax_details["transferRate"]:.1f}%', 0, 1)
         
@@ -329,13 +329,17 @@ def calculate_inheritance_tax(value):
     
     return tax, calculation_steps, effective_rate
 
-# 양도소득세 계산 함수
+# 양도소득세 계산 함수 - 오류 수정
 def calculate_transfer_tax(gain, acquisition_value):
+    # 양도차익 계산 - 수정된 부분
+    transfer_profit = gain - acquisition_value
+    
     # 기본공제 250만원 적용
-    taxable_gain = max(0, gain - 2500000)
+    taxable_gain = max(0, transfer_profit - 2500000)
     
     calculation_steps = []
-    calculation_steps.append({"description": "양도차익 계산", "detail": f"양도가액({simple_format(gain)}원) - 취득가액({simple_format(acquisition_value)}원) = {simple_format(gain)}원"})
+    # 양도차익 계산 단계 - 수정된 부분
+    calculation_steps.append({"description": "양도차익 계산", "detail": f"양도가액({simple_format(gain)}원) - 취득가액({simple_format(acquisition_value)}원) = {simple_format(transfer_profit)}원"})
     calculation_steps.append({"description": "기본공제", "detail": f"2,500,000원"})
     calculation_steps.append({"description": "과세표준", "detail": f"{simple_format(taxable_gain)}원"})
     
@@ -353,9 +357,9 @@ def calculate_transfer_tax(gain, acquisition_value):
         calculation_steps.append({"description": "합계", "detail": f"{simple_format(tax)}원"})
     
     # 실효세율 계산
-    effective_rate = (tax / gain) * 100 if gain > 0 else 0
+    effective_rate = (tax / transfer_profit) * 100 if transfer_profit > 0 else 0
     
-    return tax, calculation_steps, effective_rate
+    return tax, calculation_steps, effective_rate, transfer_profit
 
 # 청산소득세 계산 함수
 def calculate_liquidation_tax(income, acquisition_value, is_family_corp=False):
@@ -402,7 +406,7 @@ def calculate_liquidation_tax(income, acquisition_value, is_family_corp=False):
     
     return corporate_tax, dividend_tax, total_tax, calculation_steps, effective_rate
 
-# 세금 계산 함수
+# 세금 계산 함수 (수정)
 def calculate_tax_details(value, owned_shares, share_price, is_family_corp=False):
     if not value:
         return None
@@ -412,10 +416,9 @@ def calculate_tax_details(value, owned_shares, share_price, is_family_corp=False
     # 상속증여세
     inheritance_tax, inheritance_steps, inheritance_rate = calculate_inheritance_tax(owned_value)
     
-    # 양도소득세
+    # 양도소득세 - 함수 수정됨
     acquisition_value = owned_shares * share_price
-    transfer_profit = owned_value - acquisition_value
-    transfer_tax, transfer_steps, transfer_rate = calculate_transfer_tax(transfer_profit, acquisition_value)
+    transfer_tax, transfer_steps, transfer_rate, transfer_profit = calculate_transfer_tax(owned_value, acquisition_value)
     
     # 청산소득세
     corporate_tax, dividend_tax, total_liquidation_tax, liquidation_steps, liquidation_rate = calculate_liquidation_tax(owned_value, acquisition_value, is_family_corp)
@@ -491,10 +494,10 @@ else:
         st.markdown("<div class='tax-description'>주식을 타인에게 무상으로 증여할 경우 발생하는 세금입니다. 증여 받은 사람이 납부합니다.</div>", unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
     
-    # 양도소득세 카드
+    # 양도소득세 카드 - "지방소득세 포함" 추가
     with col2:
         st.markdown("<div class='tax-card'>", unsafe_allow_html=True)
-        st.markdown("<div class='tax-title'>양도소득세</div>", unsafe_allow_html=True)
+        st.markdown("<div class='tax-title'>양도소득세(지방소득세 포함)</div>", unsafe_allow_html=True)
         st.markdown(f"<div class='tax-amount'>{simple_format(tax_details['transferTax'])}원</div>", unsafe_allow_html=True)
         st.markdown(f"<div class='tax-rate'>적용 세율: 3억 이하 22%, 초과 27.5%</div>", unsafe_allow_html=True)
         st.markdown("<div class='tax-description'>주식을 매각하여 발생한 이익(양도차익)에 대해 부과되는 세금입니다. 기본공제 250만원이 적용됩니다.</div>", unsafe_allow_html=True)
@@ -530,7 +533,7 @@ else:
         for step in tax_details['transferSteps']:
             st.markdown(f"<div class='calculation-step'>{step['description']}: {step['detail']}</div>", unsafe_allow_html=True)
         
-        st.markdown(f"<p><b>총 양도소득세: {simple_format(tax_details['transferTax'])}원</b> (실효세율: {tax_details['transferRate']:.1f}%)</p>", unsafe_allow_html=True)
+        st.markdown(f"<p><b>총 양도소득세(지방소득세 포함): {simple_format(tax_details['transferTax'])}원</b> (실효세율: {tax_details['transferRate']:.1f}%)</p>", unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
     
     # 청산소득세 계산 세부내역
@@ -576,7 +579,7 @@ else:
     </div>
     """, unsafe_allow_html=True)
     
-    # 세금 비교 테이블 (균형있게)
+    # 세금 비교 테이블 (균형있게) - 양도소득세 표시 수정
     st.markdown(f"""
     <table class="tax-compare-table">
         <thead>
@@ -593,7 +596,7 @@ else:
                 <td>{tax_details['inheritanceRate']:.1f}%</td>
             </tr>
             <tr class="{transfer_class}">
-                <td>양도소득세</td>
+                <td>양도소득세(지방소득세 포함)</td>
                 <td class="tax-amount">{simple_format(tax_details['transferTax'])}원</td>
                 <td>{tax_details['transferRate']:.1f}%</td>
             </tr>
@@ -621,7 +624,7 @@ else:
         st.markdown("<li>30억 초과: 50%</li>", unsafe_allow_html=True)
         st.markdown("</ul>", unsafe_allow_html=True)
         
-        st.markdown("<h4>양도소득세율</h4>", unsafe_allow_html=True)
+        st.markdown("<h4>양도소득세율(지방소득세 포함)</h4>", unsafe_allow_html=True)
         st.markdown("<ul>", unsafe_allow_html=True)
         st.markdown("<li>3억 이하: 22%</li>", unsafe_allow_html=True)
         st.markdown("<li>3억 초과: 27.5%</li>", unsafe_allow_html=True)
@@ -734,7 +737,7 @@ else:
                             <td>{tax_details['inheritanceRate']:.1f}%</td>
                         </tr>
                         <tr>
-                            <td>양도소득세</td>
+                            <td>양도소득세(지방소득세 포함)</td>
                             <td>{simple_format(tax_details['transferTax'])}원</td>
                             <td>{tax_details['transferRate']:.1f}%</td>
                         </tr>
@@ -762,7 +765,7 @@ else:
                     </div>
                     
                     <div class="tax-box">
-                        <h3>양도소득세 계산</h3>
+                        <h3>양도소득세(지방소득세 포함) 계산</h3>
                         <ul>
                             {''.join([f"<li>{step['description']}: {step['detail']}</li>" for step in tax_details['transferSteps']])}
                         </ul>
@@ -805,7 +808,7 @@ else:
                     '항목': [
                         '회사명', '평가 기준일', '주당 평가액', '회사 총가치', '대표이사 보유주식 가치',
                         '증여세', '증여세 실효세율', 
-                        '양도소득세', '양도소득세 실효세율', 
+                        '양도소득세(지방소득세 포함)', '양도소득세 실효세율', 
                         '청산소득세', '청산소득세 실효세율',
                         '최적 세금 옵션'
                     ],
