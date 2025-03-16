@@ -181,8 +181,6 @@ if 'net_income2_unit' not in st.session_state:
     st.session_state.net_income2_unit = "원"
 if 'net_income3_unit' not in st.session_state:
     st.session_state.net_income3_unit = "원"
-if 'share_price_unit' not in st.session_state:
-    st.session_state.share_price_unit = "원"
 
 # 단위 변환 함수
 def convert_to_base_unit(value, unit):
@@ -209,7 +207,8 @@ def format_number(num, in_thousands=False):
 
 # 입력 필드 리셋 함수
 def reset_field(field_key):
-    st.session_state[field_key] = 0
+    if field_key in st.session_state:
+        del st.session_state[field_key]
 
 # 정규식 패턴으로 데이터 찾기
 def find_with_patterns(text, patterns):
@@ -731,11 +730,9 @@ with st.expander("회사 정보", expanded=True):
         # 리셋 버튼 추가
         reset_btn = st.button("✖", key="reset_total_equity", help="입력값 초기화")
         if reset_btn:
-            if total_equity_unit == "원":
-                st.session_state.total_equity_input = 0
-            else:
-                st.session_state.total_equity_input = 0
-            st.experimental_rerun()
+            if "total_equity_input" in st.session_state:
+                del st.session_state["total_equity_input"]
+                return
             
         st.markdown("</div>", unsafe_allow_html=True)
         
@@ -794,8 +791,9 @@ with st.expander("당기순이익 (최근 3개년)", expanded=True):
         # 리셋 버튼 추가
         reset_btn = st.button("✖", key="reset_net_income1", help="입력값 초기화")
         if reset_btn:
-            st.session_state.income_year1_input = 0
-            st.experimental_rerun()
+            if "income_year1_input" in st.session_state:
+                del st.session_state["income_year1_input"]
+                return
             
         st.markdown("</div>", unsafe_allow_html=True)
         
@@ -847,8 +845,9 @@ with st.expander("당기순이익 (최근 3개년)", expanded=True):
         # 리셋 버튼 추가
         reset_btn = st.button("✖", key="reset_net_income2", help="입력값 초기화")
         if reset_btn:
-            st.session_state.income_year2_input = 0
-            st.experimental_rerun()
+            if "income_year2_input" in st.session_state:
+                del st.session_state["income_year2_input"]
+                return
             
         st.markdown("</div>", unsafe_allow_html=True)
         
@@ -900,8 +899,9 @@ with st.expander("당기순이익 (최근 3개년)", expanded=True):
         # 리셋 버튼 추가
         reset_btn = st.button("✖", key="reset_net_income3", help="입력값 초기화")
         if reset_btn:
-            st.session_state.income_year3_input = 0
-            st.experimental_rerun()
+            if "income_year3_input" in st.session_state:
+                del st.session_state["income_year3_input"]
+                return
             
         st.markdown("</div>", unsafe_allow_html=True)
         
@@ -1017,8 +1017,10 @@ with st.expander("주주 정보", expanded=True):
             # 리셋 버튼 추가
             reset_btn = st.button("✖", key=f"reset_shareholder_shares_{i}", help="입력값 초기화")
             if reset_btn:
-                st.session_state[f"shareholder_shares_input_{i}"] = 0
-                st.experimental_rerun()
+                key = f"shareholder_shares_input_{i}"
+                if key in st.session_state:
+                    del st.session_state[key]
+                    return
                 
             st.markdown("</div>", unsafe_allow_html=True)
             
