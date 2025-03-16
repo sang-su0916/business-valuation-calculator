@@ -100,26 +100,27 @@ st.markdown("""
         border-collapse: collapse;
         margin: 20px 0;
         font-size: 15px;
-        border: 1px solid #dee2e6;
+        table-layout: fixed;
     }
     .tax-compare-table th {
-        background-color: #f8f9fa;
+        background-color: #f1f8ff;
         padding: 12px;
         text-align: center;
         border: 1px solid #dee2e6;
-        font-weight: 500;
+        font-weight: 600;
     }
     .tax-compare-table td {
         padding: 12px;
         border: 1px solid #dee2e6;
     }
-    .tax-compare-table td.tax-type {
-        text-align: center;
-        width: 33.3%;
+    .tax-type {
+        text-align: left;
+        font-weight: 500;
     }
-    .tax-compare-table td.tax-amount {
+    .tax-amount {
         text-align: right;
-        width: 33.3%;
+        font-family: 'Courier New', monospace;
+        font-weight: 500;
     }
     .analysis-section {
         background-color: #e9f7ef;
@@ -604,57 +605,49 @@ else:
         st.markdown("</div>", unsafe_allow_html=True)
     
     # 현재 vs 미래 세금 비교
-    st.markdown("<h2>현재 vs 미래 세금 비교</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='margin-top:30px;'>현재 vs 미래 세금 비교</h2>", unsafe_allow_html=True)
     
     # 세금 증가율 계산
     inheritance_increase = (future_inheritance_tax / current_inheritance_tax - 1) * 100
     transfer_increase = (future_transfer_tax / current_transfer_tax - 1) * 100
     liquidation_increase = (future_liquidation_tax / current_liquidation_tax - 1) * 100
     
-    # 수정된 세금 비교 테이블
+    # 개선된 테이블 구조
     st.markdown("""
     <table class="tax-compare-table">
         <thead>
             <tr>
-                <th width="33.3%">세금 유형</th>
-                <th width="33.3%">현재 (2025년)</th>
-                <th width="33.3%">미래</th>
+                <th style="width:34%;">세금 유형</th>
+                <th style="width:33%;">현재 (2025년)</th>
+                <th style="width:33%;">미래</th>
             </tr>
         </thead>
         <tbody>
-    """, unsafe_allow_html=True)
-    
-    # 증여세 비교 행
-    st.markdown(f"""
-    <tr>
-        <td class="tax-type">증여세 (누진세율)</td>
-        <td class="tax-amount">{simple_format(current_inheritance_tax)}원</td>
-        <td class="tax-amount blue-text">{simple_format(future_inheritance_tax)}원</td>
-    </tr>
-    """, unsafe_allow_html=True)
-    
-    # 양도소득세 비교 행
-    st.markdown(f"""
-    <tr>
-        <td class="tax-type">양도소득세 (22%~27.5%)</td>
-        <td class="tax-amount">{simple_format(current_transfer_tax)}원</td>
-        <td class="tax-amount blue-text">{simple_format(future_transfer_tax)}원</td>
-    </tr>
-    """, unsafe_allow_html=True)
-    
-    # 청산소득세 비교 행
-    st.markdown(f"""
-    <tr>
-        <td class="tax-type">청산소득세 (법인세+배당세)</td>
-        <td class="tax-amount">{simple_format(current_liquidation_tax)}원</td>
-        <td class="tax-amount blue-text">{simple_format(future_liquidation_tax)}원</td>
-    </tr>
-    """, unsafe_allow_html=True)
-    
-    st.markdown("""
+            <tr>
+                <td class="tax-type">증여세 (누진세율)</td>
+                <td class="tax-amount">{0}원</td>
+                <td class="tax-amount blue-text">{1}원</td>
+            </tr>
+            <tr>
+                <td class="tax-type">양도소득세 (22%~27.5%)</td>
+                <td class="tax-amount">{2}원</td>
+                <td class="tax-amount blue-text">{3}원</td>
+            </tr>
+            <tr>
+                <td class="tax-type">청산소득세 (법인세+배당세)</td>
+                <td class="tax-amount">{4}원</td>
+                <td class="tax-amount blue-text">{5}원</td>
+            </tr>
         </tbody>
     </table>
-    """, unsafe_allow_html=True)
+    """.format(
+        simple_format(current_inheritance_tax),
+        simple_format(future_inheritance_tax),
+        simple_format(current_transfer_tax),
+        simple_format(future_transfer_tax),
+        simple_format(current_liquidation_tax),
+        simple_format(future_liquidation_tax)
+    ), unsafe_allow_html=True)
     
     # 세금 비교 분석
     st.markdown("<div class='analysis-section'>", unsafe_allow_html=True)
