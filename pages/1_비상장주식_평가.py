@@ -571,25 +571,8 @@ def get_html_download_link(filename="비상장주식_평가_데이터.html"):
     href = f'<a href="data:text/html;base64,{b64}" download="{filename}" class="download-button">📄 평가 데이터 HTML 다운로드</a>'
     return href
 
-# 도구 표시 토글 함수
-def toggle_tools():
-    st.session_state.show_tools = not st.session_state.show_tools
-
 # 페이지 헤더
 st.title("비상장주식 가치평가")
-
-# 도구 토글 버튼 (고정 위치)
-st.markdown(
-    f"""
-    <button 
-        onclick="document.getElementById('tools').{'scrollIntoView({{behavior:\"smooth\"}}); document.querySelector(\".streamlit-expanderHeader\").click()' if not st.session_state.show_tools else ''}"
-        class="tools-button"
-    >
-        {'🔍 고급 도구' if not st.session_state.show_tools else '🔍 고급 도구'}
-    </button>
-    """,
-    unsafe_allow_html=True
-)
 
 # 고급 도구 섹션
 tools_expander = st.expander("🔍 고급 도구 (데이터 업로드/다운로드)", expanded=st.session_state.show_tools)
@@ -638,4 +621,29 @@ with tools_expander:
                         extracted_items.append(f"총 발행주식수: {format_number(extracted_data['shares'])}주")
                     
                     if 'share_price' in extracted_data:
-                        extracted_items.append(f"액면금액: {format_number(extracted_data['share
+                        extracted_items.append(f"액면금액: {format_number(extracted_data['share_price'])}원")
+                    
+                    # 추출된 데이터 표시
+                    if extracted_items:
+                        for item in extracted_items:
+                            st.write(f"✓ {item}")
+                    
+                        # 데이터 적용 버튼
+                        if st.button("추출된 데이터 적용하기"):
+                            # 추출된 데이터를 세션 상태에 적용
+                            if 'company_name' in extracted_data:
+                                st.session_state.company_name = extracted_data['company_name']
+                            
+                            if 'total_equity' in extracted_data:
+                                st.session_state.total_equity = extracted_data['total_equity']
+                            
+                            if 'net_income1' in extracted_data:
+                                st.session_state.net_income1 = extracted_data['net_income1']
+                            
+                            if 'net_income2' in extracted_data:
+                                st.session_state.net_income2 = extracted_data['net_income2']
+                            
+                            if 'net_income3' in extracted_data:
+                                st.session_state.net_income3 = extracted_data['net_income3']
+                            
+                            if 'shares' in extracte
