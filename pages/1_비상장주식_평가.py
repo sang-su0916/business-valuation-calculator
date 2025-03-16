@@ -141,9 +141,13 @@ if 'shareholder_count' not in st.session_state:
     st.session_state.shareholder_count = 1
 
 # 숫자 형식화 함수
-def format_number(num):
+def format_number(num, in_thousands=False):
     try:
-        return "{:,}".format(int(num))
+        if in_thousands:
+            # 천원 단위로 변환 (1,000,000,000원 -> 1,000,000천원)
+            return "{:,}".format(int(num) // 1000) + "천"
+        else:
+            return "{:,}".format(int(num))
     except:
         return str(num)
 
@@ -348,10 +352,10 @@ def generate_pdf():
         pdf.set_font('Arial', 'B', 14)
         pdf.cell(190, 10, 'Financial Information', 0, 1)
         pdf.set_font('Arial', '', 12)
-        pdf.cell(190, 10, f'Total Equity: {format_number(st.session_state.total_equity)} KRW', 0, 1)
-        pdf.cell(190, 10, f'Net Income (Year 1): {format_number(st.session_state.net_income1)} KRW (Weight 3)', 0, 1)
-        pdf.cell(190, 10, f'Net Income (Year 2): {format_number(st.session_state.net_income2)} KRW (Weight 2)', 0, 1)
-        pdf.cell(190, 10, f'Net Income (Year 3): {format_number(st.session_state.net_income3)} KRW (Weight 1)', 0, 1)
+        pdf.cell(190, 10, f'Total Equity: {format_number(st.session_state.total_equity, True)} KRW', 0, 1)
+        pdf.cell(190, 10, f'Net Income (Year 1): {format_number(st.session_state.net_income1, True)} KRW (Weight 3)', 0, 1)
+        pdf.cell(190, 10, f'Net Income (Year 2): {format_number(st.session_state.net_income2, True)} KRW (Weight 2)', 0, 1)
+        pdf.cell(190, 10, f'Net Income (Year 3): {format_number(st.session_state.net_income3, True)} KRW (Weight 1)', 0, 1)
         pdf.ln(5)
         
         # 주식 정보
@@ -377,14 +381,17 @@ def generate_pdf():
             pdf.set_font('Arial', 'B', 12)
             pdf.cell(190, 10, f'Valuation Method: {st.session_state.stock_value["methodText"]}', 0, 1)
             pdf.cell(190, 10, f'Final Value per Share: {format_number(st.session_state.stock_value["finalValue"])} KRW', 0, 1)
-            pdf.cell(190, 10, f'Total Company Value: {format_number(st.session_state.stock_value["totalValue"])} KRW', 0, 1)
+            pdf.cell(190, 10, f'Total Company Value: {format_number(st.session_state.stock_value["totalValue"], True)} KRW', 0, 1)
         
         # PDF를 바이트로 변환
         pdf_output = pdf.output(dest='S').encode('latin-1')
         return pdf_output
     
     except Exception as e:
-        # 오류 메시지 표시하지 않고 None 반환
+        # 디버깅용 오류 출력
+        import traceback
+        print(f"PDF 생성 오류: {e}")
+        print(traceback.format_exc())
         return None
 
 # HTML 다운로드용 내용 생성
@@ -611,7 +618,7 @@ with st.expander("회사 정보", expanded=True):
             key="total_equity_input",
             label_visibility="collapsed"
         )
-        st.markdown(f"<div class='amount-display'>금액: {format_number(total_equity)}원</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='amount-display'>금액: {format_number(total_equity, True)}원</div>", unsafe_allow_html=True)
         st.markdown("<div class='field-description'>재무상태표(대차대조표)상의 자본총계 금액입니다. 평가기준일 현재의 금액을 입력하세요.</div>", unsafe_allow_html=True)
 
 # 당기순이익 입력
@@ -630,7 +637,7 @@ with st.expander("당기순이익 (최근 3개년)", expanded=True):
             key="income_year1_input",
             label_visibility="collapsed"
         )
-        st.markdown(f"<div class='amount-display'>금액: {format_number(net_income1)}원</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='amount-display'>금액: {format_number(net_income1, True)}원</div>", unsafe_allow_html=True)
         # 설명 제거함
         
     with col2:
@@ -643,7 +650,7 @@ with st.expander("당기순이익 (최근 3개년)", expanded=True):
             key="income_year2_input",
             label_visibility="collapsed"
         )
-        st.markdown(f"<div class='amount-display'>금액: {format_number(net_income2)}원</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='amount-display'>금액: {format_number(net_income2, True)}원</div>", unsafe_allow_html=True)
         # 설명 제거함
         
     with col3:
@@ -656,7 +663,7 @@ with st.expander("당기순이익 (최근 3개년)", expanded=True):
             key="income_year3_input",
             label_visibility="collapsed"
         )
-        st.markdown(f"<div class='amount-display'>금액: {format_number(net_income3)}원</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='amount-display'>금액: {format_number(net_income3, True)}원</div>", unsafe_allow_html=True)
         # 설명 제거함
 
 # 주식 정보 입력
@@ -860,7 +867,7 @@ if st.session_state.evaluated and st.session_state.stock_value:
     <h5>적용된 평가 방식: {stock_value['methodText']}</h5>
     <p>최종 평가액은 자본총계 {format_number(total_equity)}원을 기준으로 계산되었으며, 
     가중평균 당기순이익 {format_number(stock_value['weightedIncome'])}원과 
-    환원율 {interest_rate}%를 적용하여 산출되었습니다.</p>
+    환원율 {st.session_state.interest_rate}%를 적용하여 산출되었습니다.</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -870,19 +877,28 @@ if st.session_state.evaluated and st.session_state.stock_value:
         tab1, tab2, tab3 = st.tabs(["PDF", "HTML", "CSV"])
         
         with tab1:
-            # PDF 다운로드 섹션 수정 (경고 메시지 제거)
-            if st.button("PDF 생성하기", key="generate_pdf"):
-                try:
-                    pdf_data = generate_pdf()
-                    if pdf_data:
-                        st.download_button(
-                            label="📄 PDF 파일 다운로드",
-                            data=pdf_data,
-                            file_name=f"비상장주식_평가_{st.session_state.company_name}_{st.session_state.eval_date}.pdf",
-                            mime="application/pdf"
-                        )
-                except Exception as e:
-                    st.info("PDF 생성 중 오류가 발생했습니다. HTML 형식으로 다운로드해보세요.")
+            # PDF 다운로드 섹션 수정 - 직접 다운로드 버튼 표시
+            pdf_data = generate_pdf()
+            if pdf_data:
+                st.download_button(
+                    label="📄 PDF 파일 다운로드",
+                    data=pdf_data,
+                    file_name=f"비상장주식_평가_{st.session_state.company_name}_{st.session_state.eval_date}.pdf",
+                    mime="application/pdf"
+                )
+            else:
+                if st.button("PDF 다시 생성하기", key="regenerate_pdf"):
+                    with st.spinner("PDF 생성 중..."):
+                        pdf_data = generate_pdf()
+                        if pdf_data:
+                            st.download_button(
+                                label="📄 PDF 파일 다운로드",
+                                data=pdf_data,
+                                file_name=f"비상장주식_평가_{st.session_state.company_name}_{st.session_state.eval_date}.pdf",
+                                mime="application/pdf"
+                            )
+                        else:
+                            st.info("PDF 생성 중 오류가 발생했습니다. FPDF 라이브러리가 설치되어 있는지 확인하거나 HTML 형식으로 다운로드해보세요.")
         
         with tab2:
             if st.button("HTML 파일 생성하기", key="generate_html"):
