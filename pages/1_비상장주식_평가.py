@@ -330,12 +330,13 @@ def apply_extracted_data(extracted_data):
 
 # PDF 생성 함수
 def generate_pdf():
+    global FPDF_AVAILABLE  # global 변수 선언 추가
+    
     if not FPDF_AVAILABLE:
         # FPDF를 자동으로 설치 시도
         try:
             import subprocess
             subprocess.check_call(['pip', 'install', 'fpdf'])
-            global FPDF_AVAILABLE
             FPDF_AVAILABLE = True
         except:
             return None
