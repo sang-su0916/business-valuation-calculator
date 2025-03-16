@@ -193,7 +193,7 @@ def convert_to_base_unit(value, unit):
 # 단위에 맞게 표시 형식 변환
 def format_by_unit(value, unit):
     if unit == "천원":
-        return format_number(value // 1000) + "천"
+        return format_number(value // 1000)
     return format_number(value)
 
 # 숫자 형식화 함수
@@ -731,8 +731,11 @@ with st.expander("회사 정보", expanded=True):
         # 리셋 버튼 추가
         reset_btn = st.button("✖", key="reset_total_equity", help="입력값 초기화")
         if reset_btn:
-            st.session_state.total_equity_input = 0
-            total_equity = 0
+            if total_equity_unit == "원":
+                st.session_state.total_equity_input = 0
+            else:
+                st.session_state.total_equity_input = 0
+            st.experimental_rerun()
             
         st.markdown("</div>", unsafe_allow_html=True)
         
@@ -745,7 +748,10 @@ with st.expander("회사 정보", expanded=True):
         st.session_state.total_equity = actual_value
         
         # 금액 표시
-        st.markdown(f"<div class='amount-display'>금액: {format_by_unit(actual_value, total_equity_unit)}{total_equity_unit}</div>", unsafe_allow_html=True)
+        if total_equity_unit == "원":
+            st.markdown(f"<div class='amount-display'>금액: {format_number(actual_value)}원</div>", unsafe_allow_html=True)
+        else:
+            st.markdown(f"<div class='amount-display'>금액: {format_number(actual_value // 1000)}천원</div>", unsafe_allow_html=True)
         st.markdown("<div class='field-description'>재무상태표(대차대조표)상의 자본총계 금액입니다. 평가기준일 현재의 금액을 입력하세요.</div>", unsafe_allow_html=True)
 
 # 당기순이익 입력
@@ -789,7 +795,7 @@ with st.expander("당기순이익 (최근 3개년)", expanded=True):
         reset_btn = st.button("✖", key="reset_net_income1", help="입력값 초기화")
         if reset_btn:
             st.session_state.income_year1_input = 0
-            net_income1 = 0
+            st.experimental_rerun()
             
         st.markdown("</div>", unsafe_allow_html=True)
         
@@ -802,7 +808,10 @@ with st.expander("당기순이익 (최근 3개년)", expanded=True):
         st.session_state.net_income1 = actual_value
         
         # 금액 표시
-        st.markdown(f"<div class='amount-display'>금액: {format_by_unit(actual_value, net_income1_unit)}{net_income1_unit}</div>", unsafe_allow_html=True)
+        if net_income1_unit == "원":
+            st.markdown(f"<div class='amount-display'>금액: {format_number(actual_value)}원</div>", unsafe_allow_html=True)
+        else:
+            st.markdown(f"<div class='amount-display'>금액: {format_number(actual_value // 1000)}천원</div>", unsafe_allow_html=True)
         
     with col2:
         st.markdown("##### 2년 전 (가중치 2배)")
@@ -839,7 +848,7 @@ with st.expander("당기순이익 (최근 3개년)", expanded=True):
         reset_btn = st.button("✖", key="reset_net_income2", help="입력값 초기화")
         if reset_btn:
             st.session_state.income_year2_input = 0
-            net_income2 = 0
+            st.experimental_rerun()
             
         st.markdown("</div>", unsafe_allow_html=True)
         
@@ -852,7 +861,10 @@ with st.expander("당기순이익 (최근 3개년)", expanded=True):
         st.session_state.net_income2 = actual_value
         
         # 금액 표시
-        st.markdown(f"<div class='amount-display'>금액: {format_by_unit(actual_value, net_income2_unit)}{net_income2_unit}</div>", unsafe_allow_html=True)
+        if net_income2_unit == "원":
+            st.markdown(f"<div class='amount-display'>금액: {format_number(actual_value)}원</div>", unsafe_allow_html=True)
+        else:
+            st.markdown(f"<div class='amount-display'>금액: {format_number(actual_value // 1000)}천원</div>", unsafe_allow_html=True)
         
     with col3:
         st.markdown("##### 3년 전 (가중치 1배)")
@@ -889,7 +901,7 @@ with st.expander("당기순이익 (최근 3개년)", expanded=True):
         reset_btn = st.button("✖", key="reset_net_income3", help="입력값 초기화")
         if reset_btn:
             st.session_state.income_year3_input = 0
-            net_income3 = 0
+            st.experimental_rerun()
             
         st.markdown("</div>", unsafe_allow_html=True)
         
@@ -902,7 +914,10 @@ with st.expander("당기순이익 (최근 3개년)", expanded=True):
         st.session_state.net_income3 = actual_value
         
         # 금액 표시
-        st.markdown(f"<div class='amount-display'>금액: {format_by_unit(actual_value, net_income3_unit)}{net_income3_unit}</div>", unsafe_allow_html=True)
+        if net_income3_unit == "원":
+            st.markdown(f"<div class='amount-display'>금액: {format_number(actual_value)}원</div>", unsafe_allow_html=True)
+        else:
+            st.markdown(f"<div class='amount-display'>금액: {format_number(actual_value // 1000)}천원</div>", unsafe_allow_html=True)
 
 # 주식 정보 입력
 with st.expander("주식 정보", expanded=True):
@@ -910,9 +925,6 @@ with st.expander("주식 정보", expanded=True):
     
     with col1:
         st.markdown("<div class='section-header'>총 발행주식수</div>", unsafe_allow_html=True)
-        
-        # 숫자 입력 컨테이너
-        st.markdown("<div class='number-input-container'>", unsafe_allow_html=True)
         
         shares = st.number_input(
             "총 발행주식수", 
@@ -924,41 +936,14 @@ with st.expander("주식 정보", expanded=True):
             label_visibility="collapsed"
         )
         
-        # 리셋 버튼 추가
-        reset_btn = st.button("✖", key="reset_shares", help="입력값 초기화")
-        if reset_btn:
-            st.session_state.shares_input = 1
-            shares = 1
-            
-        st.markdown("</div>", unsafe_allow_html=True)
-        
         st.markdown(f"<div class='amount-display'>총 {format_number(shares)}주</div>", unsafe_allow_html=True)
         
     with col2:
         st.markdown("<div class='section-header'>액면금액 (원)</div>", unsafe_allow_html=True)
         
-        # 단위 선택 추가
-        share_price_unit = st.radio(
-            "단위 선택 (액면금액)",
-            options=["원", "천원"],
-            horizontal=True,
-            key="share_price_unit_radio",
-            label_visibility="collapsed",
-            index=0 if st.session_state.share_price_unit == "원" else 1
-        )
-        st.session_state.share_price_unit = share_price_unit
-        
-        # 숫자 입력 컨테이너
-        st.markdown("<div class='number-input-container'>", unsafe_allow_html=True)
-        
-        # 입력값 변환 (천원 단위로 입력했다면 원 단위로 변환)
-        display_value = st.session_state.share_price
-        if share_price_unit == "천원":
-            display_value = display_value // 1000
-            
         share_price = st.number_input(
             "액면금액 (원)", 
-            value=display_value, 
+            value=st.session_state.share_price, 
             min_value=0, 
             format="%d",
             help="주식 1주당 액면가액입니다. 일반적으로 100원, 500원, 1,000원, 5,000원 등으로 설정됩니다.",
@@ -966,24 +951,11 @@ with st.expander("주식 정보", expanded=True):
             label_visibility="collapsed"
         )
         
-        # 리셋 버튼 추가
-        reset_btn = st.button("✖", key="reset_share_price", help="입력값 초기화")
-        if reset_btn:
-            st.session_state.share_price_input = 0
-            share_price = 0
-            
-        st.markdown("</div>", unsafe_allow_html=True)
-        
-        # 실제 값 계산 (천원 단위로 입력했다면 원 단위로 변환)
-        actual_value = share_price
-        if share_price_unit == "천원":
-            actual_value = share_price * 1000
-            
         # 세션 상태 업데이트
-        st.session_state.share_price = actual_value
+        st.session_state.share_price = share_price
         
         # 금액 표시
-        st.markdown(f"<div class='amount-display'>금액: {format_by_unit(actual_value, share_price_unit)}{share_price_unit}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='amount-display'>금액: {format_number(share_price)}원</div>", unsafe_allow_html=True)
         
     with col3:
         st.markdown("<div class='section-header'>환원율</div>", unsafe_allow_html=True)
@@ -1046,7 +1018,7 @@ with st.expander("주주 정보", expanded=True):
             reset_btn = st.button("✖", key=f"reset_shareholder_shares_{i}", help="입력값 초기화")
             if reset_btn:
                 st.session_state[f"shareholder_shares_input_{i}"] = 0
-                shares_owned = 0
+                st.experimental_rerun()
                 
             st.markdown("</div>", unsafe_allow_html=True)
             
