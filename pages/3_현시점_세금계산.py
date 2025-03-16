@@ -31,23 +31,24 @@ st.markdown("""
         margin: 15px 0;
     }
     .tax-title {
-        font-size: 24px;
-        font-weight: bold;
+        font-size: 22px;
+        font-weight: 600;
         margin-bottom: 15px;
     }
     .tax-amount {
-        font-size: 32px;
-        font-weight: bold;
+        font-size: 26px;
+        font-weight: 600;
         margin: 10px 0;
     }
     .tax-rate {
         color: #28a745;
-        font-weight: bold;
+        font-weight: 500;
         margin-bottom: 10px;
     }
     .tax-description {
         color: #555;
         margin: 10px 0;
+        font-size: 14px;
     }
     .sidebar-guide {
         background-color: #e8f4f8;
@@ -81,85 +82,87 @@ st.markdown("""
         margin: 15px 0;
         border-radius: 5px;
     }
-    .evaluated-value {
-        background-color: #f8f9fa;
-        border-radius: 5px;
-        padding: 15px;
-        margin: 10px 0;
-    }
-    .value-display {
-        display: flex;
-        justify-content: space-between;
-        margin: 5px 0;
-    }
-    .value-label {
-        font-weight: bold;
-        color: #555;
-    }
-    .value-amount {
-        color: #0066cc;
-    }
-    .tax-comparison {
-        background-color: #e9f7ef;
-        padding: 15px;
-        border-radius: 5px;
-        margin: 15px 0;
-    }
-    .value-table {
+    /* 균형잡힌 테이블 스타일 */
+    .balanced-table {
         width: 100%;
         border-collapse: collapse;
         margin: 15px 0;
+        font-size: 15px;
     }
-    .value-table th, .value-table td {
+    .balanced-table th, .balanced-table td {
         padding: 12px;
-        border: 1px solid #ddd;
-    }
-    .value-table th {
-        background-color: #f5f9ff;
+        border: 1px solid #e0e0e0;
         text-align: left;
     }
-    .value-table td.value {
+    .balanced-table th {
+        background-color: #f5f9ff;
+        font-weight: 500;
+        color: #333;
+    }
+    .balanced-table td.label {
+        width: 25%;
+        font-weight: 500;
+    }
+    .balanced-table td.value {
+        width: 25%;
         text-align: right;
         color: #0066cc;
-        font-weight: bold;
+        font-weight: 500;
+    }
+    /* 세금 비교 테이블 스타일 */
+    .tax-comparison {
+        background-color: #f8f9fa;
+        padding: 15px;
+        border-radius: 5px;
+        margin: 15px 0;
+    }
+    .tax-comparison h3 {
+        text-align: center;
+        margin-bottom: 20px;
+        color: #2c3e50;
+        font-weight: 600;
+        font-size: 20px;
     }
     .tax-compare-table {
         width: 100%;
         border-collapse: collapse;
-        margin: 25px 0;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        font-size: 16px;
+        margin: 20px 0;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        font-size: 15px;
     }
     .tax-compare-table th {
         background-color: #f0f7fb;
-        border-bottom: 2px solid #ddd;
-        padding: 15px;
+        border: 1px solid #e0e0e0;
+        padding: 12px;
         text-align: center;
+        font-weight: 500;
+        color: #333;
     }
     .tax-compare-table td {
-        padding: 15px;
-        border-bottom: 1px solid #ddd;
-    }
-    .tax-compare-table td.tax-type {
+        padding: 12px;
+        border: 1px solid #e0e0e0;
         text-align: center;
+        font-weight: normal;
     }
     .tax-compare-table td.tax-amount {
         text-align: right;
+        font-weight: 500;
     }
-    .tax-compare-table td.tax-rate {
-        text-align: center;
+    .tax-compare-table tr.highlight {
+        background-color: #f0fff0;
     }
     .best-option-box {
         text-align: center;
-        margin: 20px 0;
-        padding: 15px;
+        margin: 15px 0;
+        padding: 12px;
         background-color: #f8f9fa;
-        border-radius: 10px;
-        border-left: 6px solid #28a745;
+        border-radius: 8px;
+        border-left: 5px solid #28a745;
     }
     .best-option-text {
-        font-size: 18px;
+        font-size: 16px;
         margin: 0;
+        font-weight: 500;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -338,17 +341,17 @@ else:
     is_family_corp = st.checkbox("가족법인 여부 (부동산임대업 주업, 지배주주 50% 초과, 상시근로자 5명 미만)", 
                               help="2025년부터 가족법인(부동산임대업 등 주업)에 대해서는 법인세 최저세율이 19%로 적용됩니다")
     
-    # 평가된 주식 가치 정보 표시 (테이블 형식으로 변경)
+    # 평가된 주식 가치 정보 표시 (균형있는 테이블 형식)
     st.markdown("<h3>평가된 주식 가치</h3>", unsafe_allow_html=True)
     
-    # 테이블 스타일로 변경된 회사 정보
+    # 균형있는 테이블 스타일로 업데이트
     st.markdown(f"""
-    <table class="value-table">
+    <table class="balanced-table">
         <tr>
-            <th width="20%">회사명:</th>
-            <td class="value" width="30%">{company_name}</td>
-            <th width="20%">회사 총가치:</th>
-            <td class="value" width="30%">{simple_format(stock_value['totalValue'])}원</td>
+            <th>회사명:</th>
+            <td class="value">{company_name}</td>
+            <th>회사 총가치:</th>
+            <td class="value">{simple_format(stock_value['totalValue'])}원</td>
         </tr>
         <tr>
             <th>주당 평가액:</th>
@@ -432,9 +435,9 @@ else:
         st.markdown(f"<p><b>총 청산소득세: {simple_format(tax_details['liquidationTax'])}원</b> (실효세율: {tax_details['liquidationRate']:.1f}%)</p>", unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
     
-    # 세금 비교 분석 (더 크고 예쁘게 변경)
+    # 세금 비교 분석 (균형있게 조정)
     st.markdown("<div class='tax-comparison'>", unsafe_allow_html=True)
-    st.markdown("<h3 style='text-align: center; margin-bottom: 20px; color: #2c3e50;'>세금 비교 분석</h3>", unsafe_allow_html=True)
+    st.markdown("<h3>세금 비교 분석</h3>", unsafe_allow_html=True)
     
     # 최적의 세금 옵션 찾기
     min_tax = min(tax_details['inheritanceTax'], tax_details['transferTax'], tax_details['liquidationTax'])
@@ -442,51 +445,60 @@ else:
     if min_tax == tax_details['inheritanceTax']:
         best_option = "증여세"
         best_color = "#4CAF50"
+        inherit_class = "highlight"
+        transfer_class = ""
+        liquid_class = ""
     elif min_tax == tax_details['transferTax']:
         best_option = "양도소득세"
         best_color = "#2196F3"
+        inherit_class = ""
+        transfer_class = "highlight"
+        liquid_class = ""
     else:
         best_option = "청산소득세"
         best_color = "#9C27B0"
+        inherit_class = ""
+        transfer_class = ""
+        liquid_class = "highlight"
     
-    # 최적 옵션 표시 (더 눈에 띄게)
+    # 최적 옵션 표시 (적절한 사이즈로)
     st.markdown(f"""
-    <div class="best-option-box" style="border-left: 6px solid {best_color};">
+    <div class="best-option-box" style="border-left: 5px solid {best_color};">
         <p class="best-option-text">현재 기업가치 수준에서는 <span style="font-weight: bold; color: {best_color};">{best_option}</span>가 세금 부담이 가장 적습니다.</p>
     </div>
     """, unsafe_allow_html=True)
     
-    # 세금 비교 테이블 (크고 예쁘게 개선)
+    # 세금 비교 테이블 (균형있게)
     st.markdown(f"""
     <table class="tax-compare-table">
         <thead>
             <tr>
-                <th width="33%">세금 유형</th>
-                <th width="33%">세액</th>
-                <th width="33%">실효세율</th>
+                <th width="33.3%">세금 유형</th>
+                <th width="33.3%">세액</th>
+                <th width="33.3%">실효세율</th>
             </tr>
         </thead>
         <tbody>
-            <tr style="background-color: {'#e8f5e9' if best_option == '증여세' else 'white'};">
-                <td class="tax-type" style="font-weight: {'bold' if best_option == '증여세' else 'normal'};">증여세</td>
-                <td class="tax-amount" style="font-weight: {'bold' if best_option == '증여세' else 'normal'};">{simple_format(tax_details['inheritanceTax'])}원</td>
-                <td class="tax-rate" style="font-weight: {'bold' if best_option == '증여세' else 'normal'};">{tax_details['inheritanceRate']:.1f}%</td>
+            <tr class="{inherit_class}">
+                <td>증여세</td>
+                <td class="tax-amount">{simple_format(tax_details['inheritanceTax'])}원</td>
+                <td>{tax_details['inheritanceRate']:.1f}%</td>
             </tr>
-            <tr style="background-color: {'#e3f2fd' if best_option == '양도소득세' else 'white'};">
-                <td class="tax-type" style="font-weight: {'bold' if best_option == '양도소득세' else 'normal'};">양도소득세</td>
-                <td class="tax-amount" style="font-weight: {'bold' if best_option == '양도소득세' else 'normal'};">{simple_format(tax_details['transferTax'])}원</td>
-                <td class="tax-rate" style="font-weight: {'bold' if best_option == '양도소득세' else 'normal'};">{tax_details['transferRate']:.1f}%</td>
+            <tr class="{transfer_class}">
+                <td>양도소득세</td>
+                <td class="tax-amount">{simple_format(tax_details['transferTax'])}원</td>
+                <td>{tax_details['transferRate']:.1f}%</td>
             </tr>
-            <tr style="background-color: {'#f3e5f5' if best_option == '청산소득세' else 'white'};">
-                <td class="tax-type" style="font-weight: {'bold' if best_option == '청산소득세' else 'normal'};">청산소득세</td>
-                <td class="tax-amount" style="font-weight: {'bold' if best_option == '청산소득세' else 'normal'};">{simple_format(tax_details['liquidationTax'])}원</td>
-                <td class="tax-rate" style="font-weight: {'bold' if best_option == '청산소득세' else 'normal'};">{tax_details['liquidationRate']:.1f}%</td>
+            <tr class="{liquid_class}">
+                <td>청산소득세</td>
+                <td class="tax-amount">{simple_format(tax_details['liquidationTax'])}원</td>
+                <td>{tax_details['liquidationRate']:.1f}%</td>
             </tr>
         </tbody>
     </table>
     """, unsafe_allow_html=True)
     
-    st.markdown("<p style='margin-top: 20px;'>주의: 이는 단순 세금 비교이며, 실제 의사결정은 개인 상황, 자산 구성, 사업 목표 등을 고려해야 합니다.</p>", unsafe_allow_html=True)
+    st.markdown("<p style='margin-top: 15px; font-size:14px;'>주의: 이는 단순 세금 비교이며, 실제 의사결정은 개인 상황, 자산 구성, 사업 목표 등을 고려해야 합니다.</p>", unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
     
     # 적용 세율 정보
