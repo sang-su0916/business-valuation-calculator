@@ -3,6 +3,8 @@ import pandas as pd
 import locale
 import numpy as np
 from datetime import datetime, timedelta
+import io
+import base64
 
 # 숫자 형식화를 위한 로케일 설정
 try:
@@ -27,21 +29,22 @@ st.markdown("""
         background-color: white;
         border-radius: 8px;
         padding: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         margin: 15px 0;
     }
     .tax-title {
-        font-size: 24px;
-        font-weight: bold;
+        font-size: 22px;
+        font-weight: 600;
         margin-bottom: 15px;
     }
     .tax-amount {
-        font-size: 32px;
-        font-weight: bold;
+        font-size: 26px;
+        font-weight: 600;
         margin: 10px 0;
     }
     .tax-rate {
         color: #28a745;
-        font-weight: bold;
+        font-weight: 500;
         margin-bottom: 10px;
     }
     .tax-description {
@@ -89,20 +92,34 @@ st.markdown("""
     }
     .blue-text {
         color: #0066cc;
-        font-weight: bold;
+        font-weight: 500;
     }
+    /* 수정된 세금 비교 테이블 스타일 */
     .tax-compare-table {
         width: 100%;
         border-collapse: collapse;
-        margin: 15px 0;
-    }
-    .tax-compare-table th, .tax-compare-table td {
+        margin: 20px 0;
+        font-size: 15px;
         border: 1px solid #dee2e6;
-        padding: 8px 12px;
-        text-align: left;
     }
     .tax-compare-table th {
         background-color: #f8f9fa;
+        padding: 12px;
+        text-align: center;
+        border: 1px solid #dee2e6;
+        font-weight: 500;
+    }
+    .tax-compare-table td {
+        padding: 12px;
+        border: 1px solid #dee2e6;
+    }
+    .tax-compare-table td.tax-type {
+        text-align: center;
+        width: 33.3%;
+    }
+    .tax-compare-table td.tax-amount {
+        text-align: right;
+        width: 33.3%;
     }
     .analysis-section {
         background-color: #e9f7ef;
@@ -110,8 +127,214 @@ st.markdown("""
         border-radius: 5px;
         margin: 15px 0;
     }
+    .download-section {
+        background-color: #f0f7fb;
+        padding: 15px;
+        border-radius: 8px;
+        margin-top: 20px;
+    }
 </style>
 """, unsafe_allow_html=True)
+
+# PDF 생성 함수
+def generate_pdf(current_tax, future_tax, company_name, growth_rate, future_years):
+    try:
+        # FPDF 라이브러리 자동 설치 시도
+        try:
+            from fpdf import FPDF
+        except ImportError:
+            try:
+                import subprocess
+                subprocess.check_call(['pip', 'install', 'fpdf'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                from fpdf import FPDF
+            except:
+                return None
+        
+        # PDF 객체 생성
+        pdf = FPDF()
+        pdf.add_page()
+        
+        # 기본 폰트 설정 (한글 지원 제한)
+        pdf.set_font('Arial', 'B', 16)
+        
+        # 제목
+        pdf.cell(190, 10, 'Future Tax Calculation Report', 0, 1, 'C')
+        pdf.ln(5)
+        
+        # 회사 정보
+        pdf.set_font('Arial', 'B', 12)
+        pdf.cell(190, 10, f'Company: {company_name}', 0, 1)
+        pdf.ln(5)
+        
+        # 예측 정보
+        pdf.set_font('Arial', '', 11)
+        pdf.cell(190, 10, f'Growth Rate: {growth_rate}% per year', 0, 1)
+        pdf.cell(190, 10, f'Prediction Period: {future_years} years', 0, 1)
+        pdf.ln(5)
+        
+        # 세금 비교 결과
+        pdf.set_font('Arial', 'B', 12)
+        pdf.cell(190, 10, 'Tax Comparison Results:', 0, 1)
+        pdf.set_font('Arial', '', 11)
+        
+        # 증여세
+        pdf.cell(60, 10, 'Gift Tax:', 0, 0)
+        pdf.cell(65, 10, f'Current: {simple_format(current_tax["inheritance"])} KRW', 0, 0)
+        pdf.cell(65, 10, f'Future: {simple_format(future_tax["inheritance"])} KRW', 0, 1)
+        
+        # 양도소득세
+        pdf.cell(60, 10, 'Capital Gains Tax:', 0, 0)
+        pdf.cell(65, 10, f'Current: {simple_format(current_tax["transfer"])} KRW', 0, 0)
+        pdf.cell(65, 10, f'Future: {simple_format(future_tax["transfer"])} KRW', 0, 1)
+        
+        # 청산소득세
+        pdf.cell(60, 10, 'Liquidation Tax:', 0, 0)
+        pdf.cell(65, 10, f'Current: {simple_format(current_tax["liquidation"])} KRW', 0, 0)
+        pdf.cell(65, 10, f'Future: {simple_format(future_tax["liquidation"])} KRW', 0, 1)
+        
+        # 최적 세금 옵션
+        pdf.ln(5)
+        pdf.set_font('Arial', 'B', 11)
+        pdf.cell(190, 10, f'Best Tax Option (Current): {current_tax["best_option"]}', 0, 1)
+        pdf.cell(190, 10, f'Best Tax Option (Future): {future_tax["best_option"]}', 0, 1)
+        
+        # 생성일
+        pdf.ln(10)
+        pdf.set_font('Arial', 'I', 8)
+        pdf.cell(190, 10, f'Generated on: {datetime.now().strftime("%Y-%m-%d")}', 0, 1)
+        
+        # PDF를 바이트로 변환
+        try:
+            return pdf.output(dest='S').encode('latin-1')
+        except Exception as e:
+            return None
+    except Exception as e:
+        return None
+
+# HTML 다운로드용 내용 생성
+def create_html_content(current_tax, future_tax, company_name, growth_rate, future_years):
+    target_year = datetime.now().year + future_years
+    
+    # 세금 증가율 계산
+    inheritance_increase = (future_tax["inheritance"] / current_tax["inheritance"] - 1) * 100
+    transfer_increase = (future_tax["transfer"] / current_tax["transfer"] - 1) * 100
+    liquidation_increase = (future_tax["liquidation"] / current_tax["liquidation"] - 1) * 100
+    
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <title>미래 세금 계산 보고서 - {company_name}</title>
+        <style>
+            body {{ font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; }}
+            h1 {{ color: #2c3e50; text-align: center; }}
+            h2 {{ color: #3498db; margin-top: 20px; }}
+            .info {{ margin-bottom: 5px; }}
+            .tax-box {{ background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin: 10px 0; }}
+            .current {{ border-left: 4px solid #3498db; }}
+            .future {{ border-left: 4px solid #e67e22; }}
+            .increase {{ color: #27ae60; font-weight: bold; }}
+            table {{ width: 100%; border-collapse: collapse; margin: 20px 0; }}
+            table, th, td {{ border: 1px solid #ddd; }}
+            th, td {{ padding: 12px; text-align: left; }}
+            th {{ background-color: #f2f2f2; }}
+            td.number {{ text-align: right; }}
+            .best-option {{ background-color: #e6f7e6; padding: 10px; border-radius: 5px; margin: 10px 0; }}
+        </style>
+    </head>
+    <body>
+        <h1>미래 세금 계산 보고서</h1>
+        
+        <h2>회사 정보</h2>
+        <div class="info">회사명: {company_name}</div>
+        
+        <h2>예측 정보</h2>
+        <div class="info">적용 성장률: 연 {growth_rate}% (복리)</div>
+        <div class="info">예측 기간: {future_years}년 (기준: {datetime.now().year}년 → 예측: {target_year}년)</div>
+        
+        <h2>현재 vs 미래 세금 비교</h2>
+        <table>
+            <tr>
+                <th>세금 유형</th>
+                <th>현재 (2025년)</th>
+                <th>미래 ({target_year}년)</th>
+                <th>증가율</th>
+            </tr>
+            <tr>
+                <td>증여세 (누진세율)</td>
+                <td class="number">{simple_format(current_tax["inheritance"])}원</td>
+                <td class="number">{simple_format(future_tax["inheritance"])}원</td>
+                <td class="number">{inheritance_increase:.1f}%</td>
+            </tr>
+            <tr>
+                <td>양도소득세 (22%~27.5%)</td>
+                <td class="number">{simple_format(current_tax["transfer"])}원</td>
+                <td class="number">{simple_format(future_tax["transfer"])}원</td>
+                <td class="number">{transfer_increase:.1f}%</td>
+            </tr>
+            <tr>
+                <td>청산소득세 (법인세+배당세)</td>
+                <td class="number">{simple_format(current_tax["liquidation"])}원</td>
+                <td class="number">{simple_format(future_tax["liquidation"])}원</td>
+                <td class="number">{liquidation_increase:.1f}%</td>
+            </tr>
+        </table>
+        
+        <div class="best-option">
+            <h3>최적 세금 옵션</h3>
+            <p>현재 기준 최적 세금 옵션: <strong>{current_tax["best_option"]}</strong></p>
+            <p>미래 기준 최적 세금 옵션: <strong>{future_tax["best_option"]}</strong></p>
+        </div>
+        
+        <div style="margin-top: 30px; padding: 10px; background-color: #f8f9fa; border-radius: 5px;">
+            <p><b>참고:</b> 이 보고서의 세금 계산은 참고용으로만 사용하시기 바랍니다. 실제 세금은 개인 상황, 보유기간, 대주주 여부, 사업 형태 등에 따라 달라질 수 있습니다.</p>
+            <p>미래 가치 예측은 단순 성장률 적용으로 실제 기업 가치 변동과는 차이가 있을 수 있습니다.</p>
+        </div>
+        
+        <div style="margin-top: 30px; text-align: center; color: #777; font-size: 0.9em;">
+            <p>생성일: {datetime.now().strftime('%Y년 %m월 %d일')}</p>
+        </div>
+    </body>
+    </html>
+    """
+    return html_content
+
+# CSV 다운로드용 내용 생성
+def create_csv_content(current_tax, future_tax, company_name, growth_rate, future_years):
+    # 현재 년도 계산
+    current_year = datetime.now().year
+    target_year = current_year + future_years
+    
+    # 세금 증가율 계산
+    inheritance_increase = (future_tax["inheritance"] / current_tax["inheritance"] - 1) * 100
+    transfer_increase = (future_tax["transfer"] / current_tax["transfer"] - 1) * 100
+    liquidation_increase = (future_tax["liquidation"] / current_tax["liquidation"] - 1) * 100
+    
+    # CSV 데이터 생성
+    data = {
+        '항목': [
+            '회사명', '성장률', '예측기간', 
+            '예측 시작 연도', '예측 종료 연도',
+            '현재 증여세', '미래 증여세', '증여세 증가율',
+            '현재 양도소득세', '미래 양도소득세', '양도소득세 증가율',
+            '현재 청산소득세', '미래 청산소득세', '청산소득세 증가율',
+            '현재 최적 세금 옵션', '미래 최적 세금 옵션'
+        ],
+        '값': [
+            company_name, f"{growth_rate}%", f"{future_years}년",
+            str(current_year), str(target_year),
+            current_tax["inheritance"], future_tax["inheritance"], f"{inheritance_increase:.1f}%",
+            current_tax["transfer"], future_tax["transfer"], f"{transfer_increase:.1f}%",
+            current_tax["liquidation"], future_tax["liquidation"], f"{liquidation_increase:.1f}%",
+            current_tax["best_option"], future_tax["best_option"]
+        ]
+    }
+    
+    # DataFrame 생성 후 CSV로 변환
+    df = pd.DataFrame(data)
+    csv = df.to_csv(index=False).encode('utf-8')
+    return csv
 
 # 페이지 헤더
 st.title("미래 세금 계산")
@@ -383,46 +606,48 @@ else:
     # 현재 vs 미래 세금 비교
     st.markdown("<h2>현재 vs 미래 세금 비교</h2>", unsafe_allow_html=True)
     
-    # 세금 비교 테이블
+    # 세금 증가율 계산
+    inheritance_increase = (future_inheritance_tax / current_inheritance_tax - 1) * 100
+    transfer_increase = (future_transfer_tax / current_transfer_tax - 1) * 100
+    liquidation_increase = (future_liquidation_tax / current_liquidation_tax - 1) * 100
+    
+    # 수정된 세금 비교 테이블
     st.markdown("""
     <table class="tax-compare-table">
         <thead>
             <tr>
-                <th>세금 유형</th>
-                <th>현재 (2025년)</th>
-                <th>미래</th>
+                <th width="33.3%">세금 유형</th>
+                <th width="33.3%">현재 (2025년)</th>
+                <th width="33.3%">미래</th>
             </tr>
         </thead>
         <tbody>
     """, unsafe_allow_html=True)
     
     # 증여세 비교 행
-    inheritance_increase = (future_inheritance_tax / current_inheritance_tax - 1) * 100
     st.markdown(f"""
     <tr>
-        <td>증여세 (누진세율)</td>
-        <td>{simple_format(current_inheritance_tax)}원</td>
-        <td class="blue-text">{simple_format(future_inheritance_tax)}원</td>
+        <td class="tax-type">증여세 (누진세율)</td>
+        <td class="tax-amount">{simple_format(current_inheritance_tax)}원</td>
+        <td class="tax-amount blue-text">{simple_format(future_inheritance_tax)}원</td>
     </tr>
     """, unsafe_allow_html=True)
     
     # 양도소득세 비교 행
-    transfer_increase = (future_transfer_tax / current_transfer_tax - 1) * 100
     st.markdown(f"""
     <tr>
-        <td>양도소득세 (22%~27.5%)</td>
-        <td>{simple_format(current_transfer_tax)}원</td>
-        <td class="blue-text">{simple_format(future_transfer_tax)}원</td>
+        <td class="tax-type">양도소득세 (22%~27.5%)</td>
+        <td class="tax-amount">{simple_format(current_transfer_tax)}원</td>
+        <td class="tax-amount blue-text">{simple_format(future_transfer_tax)}원</td>
     </tr>
     """, unsafe_allow_html=True)
     
     # 청산소득세 비교 행
-    liquidation_increase = (future_liquidation_tax / current_liquidation_tax - 1) * 100
     st.markdown(f"""
     <tr>
-        <td>청산소득세 (법인세+배당세)</td>
-        <td>{simple_format(current_liquidation_tax)}원</td>
-        <td class="blue-text">{simple_format(future_liquidation_tax)}원</td>
+        <td class="tax-type">청산소득세 (법인세+배당세)</td>
+        <td class="tax-amount">{simple_format(current_liquidation_tax)}원</td>
+        <td class="tax-amount blue-text">{simple_format(future_liquidation_tax)}원</td>
     </tr>
     """, unsafe_allow_html=True)
     
@@ -454,6 +679,21 @@ else:
         future_best = "양도소득세"
     else:
         future_best = "청산소득세"
+    
+    # 세금 최소값 데이터
+    current_tax = {
+        "inheritance": current_inheritance_tax,
+        "transfer": current_transfer_tax,
+        "liquidation": current_liquidation_tax,
+        "best_option": current_best
+    }
+    
+    future_tax = {
+        "inheritance": future_inheritance_tax,
+        "transfer": future_transfer_tax,
+        "liquidation": future_liquidation_tax,
+        "best_option": future_best
+    }
     
     st.markdown(f"<div>현재 기준으로는 <b>{current_best}</b>가 세금 부담이 가장 적습니다.</div>", unsafe_allow_html=True)
     st.markdown(f"<div>미래 기준으로는 <b>{future_best}</b>가 세금 부담이 가장 적을 것으로 예상됩니다.</div>", unsafe_allow_html=True)
@@ -499,6 +739,58 @@ else:
             st.markdown("<li>3,000억 초과: 24%</li>", unsafe_allow_html=True)
         st.markdown("<li>배당소득세: 15.4%</li>", unsafe_allow_html=True)
         st.markdown("</ul>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+    
+    # 결과 다운로드 섹션 추가
+    st.markdown("---")
+    with st.expander("📥 세금 계산 결과 다운로드", expanded=False):
+        st.markdown("<div class='download-section'>", unsafe_allow_html=True)
+        tab1, tab2, tab3 = st.tabs(["PDF", "HTML", "CSV"])
+        
+        # PDF 다운로드 탭
+        with tab1:
+            if st.button("PDF 생성하기", key="generate_pdf", type="primary"):
+                with st.spinner("PDF 생성 중..."):
+                    pdf_data = generate_pdf(current_tax, future_tax, company_name, growth_rate, years)
+                    
+                    if pdf_data:
+                        st.success("PDF 생성 완료!")
+                        st.download_button(
+                            label="📄 PDF 파일 다운로드",
+                            data=pdf_data,
+                            file_name=f"미래세금_{company_name}_{future_date.year}.pdf",
+                            mime="application/pdf"
+                        )
+                    else:
+                        st.warning("PDF 생성에 실패했습니다. HTML 형식으로 다운로드해보세요.")
+                        st.info("또는 'pip install fpdf fpdf2' 명령으로 필요한 라이브러리를 설치해보세요.")
+        
+        # HTML 다운로드 탭
+        with tab2:
+            if st.button("HTML 보고서 생성하기", key="generate_html"):
+                html_content = create_html_content(current_tax, future_tax, company_name, growth_rate, years)
+                
+                st.download_button(
+                    label="📄 HTML 파일 다운로드",
+                    data=html_content,
+                    file_name=f"미래세금_{company_name}_{future_date.year}.html",
+                    mime="text/html"
+                )
+                
+                st.info("HTML 파일을 다운로드 후 브라우저에서 열어 인쇄하면 PDF로 저장할 수 있습니다.")
+        
+        # CSV 다운로드 탭
+        with tab3:
+            if st.button("CSV 데이터 생성하기", key="generate_csv"):
+                csv_content = create_csv_content(current_tax, future_tax, company_name, growth_rate, years)
+                
+                st.download_button(
+                    label="📄 CSV 파일 다운로드",
+                    data=csv_content,
+                    file_name=f"미래세금_{company_name}_{future_date.year}.csv",
+                    mime="text/csv"
+                )
+        
         st.markdown("</div>", unsafe_allow_html=True)
     
     # 참고사항
