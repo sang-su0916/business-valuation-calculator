@@ -17,13 +17,13 @@ import base64
 import re
 import json
 
-# FPDF 라이브러리 추가 (PDF 생성용)
+# FPDF 라이브러리 추가 (PDF 생성용) - 경고 메시지 제거
 try:
     from fpdf import FPDF
     FPDF_AVAILABLE = True
 except ImportError:
     FPDF_AVAILABLE = False
-    st.warning("PDF 생성을 위한 FPDF 라이브러리가 설치되어 있지 않습니다. 'pip install fpdf'로 설치해주세요.")
+    # 경고 메시지 제거
 
 # 파일 처리 라이브러리
 try:
@@ -321,7 +321,7 @@ def apply_extracted_data(extracted_data):
 # PDF 생성 함수
 def generate_pdf():
     if not FPDF_AVAILABLE:
-        st.error("PDF 생성을 위한 FPDF 라이브러리가 설치되어 있지 않습니다.")
+        # 오류 메시지 제거하고 None 반환
         return None
     
     try:
@@ -384,7 +384,7 @@ def generate_pdf():
         return pdf_output
     
     except Exception as e:
-        st.error(f"PDF 생성 중 오류가 발생했습니다: {str(e)}")
+        # 오류 메시지 표시하지 않고 None 반환
         return None
 
 # HTML 다운로드용 내용 생성
@@ -692,19 +692,11 @@ with st.expander("주식 정보", expanded=True):
         # 설명 제거함
         
     with col3:
-        st.markdown("<div class='section-header'>환원율 (%)</div>", unsafe_allow_html=True)
-        # 환원율 10%로 고정 (슬라이더는 표시하되 비활성화)
-        interest_rate = st.slider(
-            "환원율 (%)", 
-            min_value=1, 
-            max_value=20, 
-            value=10,  # 고정 값
-            key="interest_rate_slider", 
-            help="수익가치 평가에 사용되는 환원율입니다. 일반적으로 시장금리를 반영하여 10%를 사용합니다.",
-            label_visibility="collapsed",
-            disabled=True  # 슬라이더 비활성화
-        )
-        st.markdown("<div class='field-description'>수익가치 평가 시 사용되는 할인율입니다. 환원율은 10%로 고정되어 있습니다.</div>", unsafe_allow_html=True)
+        st.markdown("<div class='section-header'>환원율</div>", unsafe_allow_html=True)
+        # 환원율 10%로 고정 표시 (슬라이더 제거)
+        st.markdown("<div style='font-size:14px; color:#666;'>환원율은 10%로 고정되어 있습니다.</div>", unsafe_allow_html=True)
+        # 세션 상태 변수 업데이트
+        st.session_state.interest_rate = 10
 
 # 주주 정보 입력
 with st.expander("주주 정보", expanded=True):
@@ -825,7 +817,7 @@ if st.button("비상장주식 평가하기", type="primary", use_container_width
         st.session_state.shares = shares
         st.session_state.owned_shares = owned_shares
         st.session_state.share_price = share_price
-        st.session_state.interest_rate = interest_rate  # 환원율 10% 고정
+        st.session_state.interest_rate = 10  # 환원율 10% 고정
         st.session_state.evaluation_method = evaluation_method
         st.session_state.shareholders = shareholders
         
@@ -878,8 +870,9 @@ if st.session_state.evaluated and st.session_state.stock_value:
         tab1, tab2, tab3 = st.tabs(["PDF", "HTML", "CSV"])
         
         with tab1:
-            if FPDF_AVAILABLE:
-                if st.button("PDF 생성하기", key="generate_pdf"):
+            # PDF 다운로드 섹션 수정 (경고 메시지 제거)
+            if st.button("PDF 생성하기", key="generate_pdf"):
+                try:
                     pdf_data = generate_pdf()
                     if pdf_data:
                         st.download_button(
@@ -888,9 +881,8 @@ if st.session_state.evaluated and st.session_state.stock_value:
                             file_name=f"비상장주식_평가_{st.session_state.company_name}_{st.session_state.eval_date}.pdf",
                             mime="application/pdf"
                         )
-            else:
-                st.warning("PDF 생성을 위한 FPDF 라이브러리가 설치되어 있지 않습니다.")
-                st.info("터미널에서 'pip install fpdf' 명령어로 설치할 수 있습니다.")
+                except Exception as e:
+                    st.info("PDF 생성 중 오류가 발생했습니다. HTML 형식으로 다운로드해보세요.")
         
         with tab2:
             if st.button("HTML 파일 생성하기", key="generate_html"):
