@@ -14,9 +14,13 @@ except:
         locale.setlocale(locale.LC_ALL, '')
 
 # 숫자 형식화 함수
-def format_number(num):
+def format_number(num, in_thousands=False):
     try:
-        return "{:,}".format(int(num))
+        if in_thousands:
+            # 천원 단위로 변환 (1,000,000,000원 -> 1,000,000천원)
+            return "{:,}".format(int(num) // 1000) + "천"
+        else:
+            return "{:,}".format(int(num))
     except:
         return str(num)
 
@@ -63,6 +67,12 @@ st.markdown("""
         color: #666;
         border-top: 1px solid #eee;
         padding-top: 10px;
+    }
+    .download-section {
+        background-color: #f0f7fb;
+        padding: 15px;
+        border-radius: 8px;
+        margin-top: 20px;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -152,6 +162,168 @@ else:
         fig.update_layout(title_text='주요 가치 비교 (주당)')
         st.plotly_chart(fig, use_container_width=True)
     st.markdown("</div>", unsafe_allow_html=True)
+    
+    # 다운로드 섹션 추가
+    with st.expander("📥 평가 결과 다운로드", expanded=False):
+        st.markdown("<div class='download-section'>", unsafe_allow_html=True)
+        tab1, tab2, tab3 = st.tabs(["PDF", "HTML", "CSV"])
+        
+        with tab1:
+            if st.button("PDF 생성하기", key="generate_pdf", type="primary"):
+                try:
+                    # 바로 처리 시도
+                    import subprocess
+                    subprocess.check_call(['pip', 'install', 'fpdf2'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    from fpdf import FPDF
+                    
+                    with st.spinner("PDF 생성 중..."):
+                        # 간단한 PDF 생성
+                        pdf = FPDF()
+                        pdf.add_page()
+                        pdf.set_font('Helvetica', 'B', 16)
+                        pdf.cell(0, 10, 'Stock Valuation Report', 0, 1, 'C')
+                        
+                        pdf.ln(10)
+                        pdf.set_font('Helvetica', '', 12)
+                        pdf.cell(0, 10, f'Company: {company_name}', 0, 1)
+                        pdf.cell(0, 10, f'Date: {eval_date}', 0, 1)
+                        pdf.cell(0, 10, f'Valuation Method: {stock_value["methodText"]}', 0, 1)
+                        pdf.ln(5)
+                        
+                        # 결과 데이터 추가
+                        pdf.set_font('Helvetica', 'B', 14)
+                        pdf.cell(0, 10, 'Valuation Results', 0, 1)
+                        pdf.set_font('Helvetica', '', 12)
+                        
+                        pdf.cell(0, 10, f'Net Asset Value per Share: {format_number(stock_value["netAssetPerShare"])} KRW', 0, 1)
+                        pdf.cell(0, 10, f'Income Value per Share: {format_number(stock_value["incomeValue"])} KRW', 0, 1)
+                        pdf.cell(0, 10, f'Asset Value with Goodwill: {format_number(stock_value["assetValueWithGoodwill"])} KRW', 0, 1)
+                        pdf.cell(0, 10, f'Final Value per Share: {format_number(stock_value["finalValue"])} KRW', 0, 1)
+                        pdf.cell(0, 10, f'Total Company Value: {format_number(stock_value["totalValue"])} KRW', 0, 1)
+                        
+                        if 'increasePercentage' in stock_value:
+                            pdf.ln(5)
+                            pdf.cell(0, 10, f'Value Increase Percentage: {stock_value["increasePercentage"]}%', 0, 1)
+                        
+                        # PDF 데이터 얻기
+                        pdf_data = pdf.output()
+                        
+                        # 다운로드 버튼 표시
+                        st.success("PDF 생성 완료!")
+                        st.download_button(
+                            label="📄 PDF 파일 다운로드",
+                            data=pdf_data,
+                            file_name=f"주식가치_평가결과_{company_name}_{eval_date}.pdf",
+                            mime="application/pdf"
+                        )
+                except Exception as e:
+                    st.error("PDF 생성에 실패했습니다.")
+                    st.info("HTML 혹은 CSV 형식으로 다운로드해 보세요.")
+                    st.code("pip install fpdf2", language="bash")
+        
+        with tab2:
+            if st.button("HTML 파일 생성하기", key="generate_html"):
+                # HTML 내용 생성
+                html_content = f"""
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <title>주식가치 평가 결과 - {company_name}</title>
+                    <style>
+                        body {{ font-family: Arial, sans-serif; margin: 20px; }}
+                        h1 {{ color: #2c3e50; text-align: center; }}
+                        h2 {{ color: #3498db; margin-top: 20px; }}
+                        .info {{ margin-bottom: 5px; }}
+                        .result {{ margin-top: 10px; font-weight: bold; }}
+                        .results-table {{ width: 100%; border-collapse: collapse; margin: 20px 0; }}
+                        .results-table th, .results-table td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
+                        .results-table th {{ background-color: #f2f2f2; }}
+                    </style>
+                </head>
+                <body>
+                    <h1>주식가치 평가 결과</h1>
+                    
+                    <h2>평가 정보</h2>
+                    <div class="info">회사명: {company_name}</div>
+                    <div class="info">평가 기준일: {eval_date}</div>
+                    <div class="info">적용 평가방식: {stock_value["methodText"]}</div>
+                    
+                    <h2>주요 계산결과</h2>
+                    <table class="results-table">
+                        <tr>
+                            <th>항목</th>
+                            <th>금액 (원)</th>
+                        </tr>
+                        <tr>
+                            <td>1주당 순자산가치</td>
+                            <td>{format_number(stock_value["netAssetPerShare"])}</td>
+                        </tr>
+                        <tr>
+                            <td>1주당 손익가치</td>
+                            <td>{format_number(stock_value["incomeValue"])}</td>
+                        </tr>
+                        <tr>
+                            <td>영업권 고려 후 자산가치</td>
+                            <td>{format_number(stock_value["assetValueWithGoodwill"])}</td>
+                        </tr>
+                        <tr>
+                            <td>최종 주당 평가액</td>
+                            <td>{format_number(stock_value["finalValue"])}</td>
+                        </tr>
+                        <tr>
+                            <td>회사 총 주식가치</td>
+                            <td>{format_number(stock_value["totalValue"])}</td>
+                        </tr>
+                        <tr>
+                            <td>대표이사 보유주식 가치</td>
+                            <td>{format_number(stock_value["ownedValue"])}</td>
+                        </tr>
+                    </table>
+                    
+                    <div class="result">자본총계({format_number(total_equity)}원) 대비 평가 회사가치는 <b>{stock_value["increasePercentage"]}%</b>로 평가되었습니다.</div>
+                    
+                    <p>※ 평가 결과는 참고용으로만 사용하시고, 정확한 세금 계산을 위해서는 전문가와 상담하시기 바랍니다.</p>
+                </body>
+                </html>
+                """
+                
+                st.download_button(
+                    label="📄 HTML 파일 다운로드",
+                    data=html_content,
+                    file_name=f"주식가치_평가결과_{company_name}_{eval_date}.html",
+                    mime="text/html"
+                )
+        
+        with tab3:
+            if st.button("CSV 파일 생성하기", key="generate_csv"):
+                # CSV 데이터 생성
+                data = {
+                    '항목': [
+                        '회사명', '평가 기준일', '적용 평가방식',
+                        '1주당 순자산가치', '1주당 손익가치', '영업권 고려 후 자산가치',
+                        '최종 주당 평가액', '회사 총 주식가치', '대표이사 보유주식 가치',
+                        '자본총계 대비 증가율'
+                    ],
+                    '값': [
+                        company_name, str(eval_date), stock_value['methodText'],
+                        stock_value["netAssetPerShare"], stock_value["incomeValue"], stock_value["assetValueWithGoodwill"],
+                        stock_value["finalValue"], stock_value["totalValue"], stock_value["ownedValue"],
+                        f"{stock_value['increasePercentage']}%"
+                    ]
+                }
+                
+                # DataFrame 생성 후 CSV로 변환
+                df = pd.DataFrame(data)
+                csv = df.to_csv(index=False).encode('utf-8')
+                
+                st.download_button(
+                    label="📄 CSV 파일 다운로드",
+                    data=csv,
+                    file_name=f"주식가치_평가결과_{company_name}_{eval_date}.csv",
+                    mime="text/csv"
+                )
+        st.markdown("</div>", unsafe_allow_html=True)
     
     # 다음 단계 안내
     st.markdown("<h3 class='next-steps-header'>📌 다음 단계 안내</h3>", unsafe_allow_html=True)
