@@ -105,32 +105,6 @@ st.markdown("""
         border-radius: 8px;
         margin-top: 20px;
     }
-    .number-input-container {
-        display: flex;
-        align-items: center;
-        margin-bottom: 5px;
-    }
-    .number-input-container .stNumberInput {
-        flex-grow: 1;
-        margin-right: 10px;
-    }
-    .reset-button {
-        color: #dc3545;
-        border: 1px solid #dc3545;
-        padding: 3px 8px;
-        border-radius: 4px;
-        cursor: pointer;
-        font-weight: bold;
-        font-size: 12px;
-        background-color: white;
-    }
-    .reset-button:hover {
-        background-color: #dc3545;
-        color: white;
-    }
-    .unit-selector {
-        margin-bottom: 5px;
-    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -171,28 +145,6 @@ if 'shareholders' not in st.session_state:
     ]
 if 'shareholder_count' not in st.session_state:
     st.session_state.shareholder_count = 1
-    
-# 단위 옵션 세션 상태 초기화
-if 'total_equity_unit' not in st.session_state:
-    st.session_state.total_equity_unit = "원"
-if 'net_income1_unit' not in st.session_state:
-    st.session_state.net_income1_unit = "원"
-if 'net_income2_unit' not in st.session_state:
-    st.session_state.net_income2_unit = "원"
-if 'net_income3_unit' not in st.session_state:
-    st.session_state.net_income3_unit = "원"
-
-# 단위 변환 함수
-def convert_to_base_unit(value, unit):
-    if unit == "천원":
-        return value * 1000
-    return value
-
-# 단위에 맞게 표시 형식 변환
-def format_by_unit(value, unit):
-    if unit == "천원":
-        return format_number(value // 1000)
-    return format_number(value)
 
 # 숫자 형식화 함수
 def format_number(num, in_thousands=False):
@@ -204,11 +156,6 @@ def format_number(num, in_thousands=False):
             return "{:,}".format(int(num))
     except:
         return str(num)
-
-# 입력 필드 리셋 함수
-def reset_field(field_key):
-    if field_key in st.session_state:
-        del st.session_state[field_key]
 
 # 정규식 패턴으로 데이터 찾기
 def find_with_patterns(text, patterns):
@@ -694,61 +641,20 @@ with st.expander("회사 정보", expanded=True):
             key="company_name_input",
             label_visibility="collapsed"
         )
+        # 회사명 설명 제거함
     
     with col2:
         st.markdown("<div class='section-header'>자본총계 (원)</div>", unsafe_allow_html=True)
-        
-        # 단위 선택 추가
-        total_equity_unit = st.radio(
-            "단위 선택",
-            options=["원", "천원"],
-            horizontal=True,
-            key="total_equity_unit_radio",
-            label_visibility="collapsed",
-            index=0 if st.session_state.total_equity_unit == "원" else 1
-        )
-        st.session_state.total_equity_unit = total_equity_unit
-        
-        # 숫자 입력 컨테이너
-        st.markdown("<div class='number-input-container'>", unsafe_allow_html=True)
-        
-        # 입력값 변환 (천원 단위로 입력했다면 원 단위로 변환)
-        display_value = st.session_state.total_equity
-        if total_equity_unit == "천원":
-            display_value = display_value // 1000
-            
         total_equity = st.number_input(
-            "자본총계", 
-            value=display_value, 
+            "자본총계 (원)", 
+            value=st.session_state.total_equity, 
             min_value=0, 
             format="%d",
             help="평가 기준일 현재 회사의 대차대조표상 자본총계를 입력하세요.",
             key="total_equity_input",
             label_visibility="collapsed"
         )
-        
-        # 리셋 버튼 추가
-        reset_btn = st.button("✖", key="reset_total_equity", help="입력값 초기화")
-        if reset_btn:
-            if "total_equity_input" in st.session_state:
-                del st.session_state["total_equity_input"]
-                return
-            
-        st.markdown("</div>", unsafe_allow_html=True)
-        
-        # 실제 값 계산 (천원 단위로 입력했다면 원 단위로 변환)
-        actual_value = total_equity
-        if total_equity_unit == "천원":
-            actual_value = total_equity * 1000
-            
-        # 세션 상태 업데이트
-        st.session_state.total_equity = actual_value
-        
-        # 금액 표시
-        if total_equity_unit == "원":
-            st.markdown(f"<div class='amount-display'>금액: {format_number(actual_value)}원</div>", unsafe_allow_html=True)
-        else:
-            st.markdown(f"<div class='amount-display'>금액: {format_number(actual_value // 1000)}천원</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='amount-display'>금액: {format_number(total_equity, True)}원</div>", unsafe_allow_html=True)
         st.markdown("<div class='field-description'>재무상태표(대차대조표)상의 자본총계 금액입니다. 평가기준일 현재의 금액을 입력하세요.</div>", unsafe_allow_html=True)
 
 # 당기순이익 입력
@@ -759,165 +665,42 @@ with st.expander("당기순이익 (최근 3개년)", expanded=True):
     
     with col1:
         st.markdown("##### 1년 전 (가중치 3배)")
-        
-        # 단위 선택 추가
-        net_income1_unit = st.radio(
-            "단위 선택 (1년 전)",
-            options=["원", "천원"],
-            horizontal=True,
-            key="net_income1_unit_radio",
-            label_visibility="collapsed",
-            index=0 if st.session_state.net_income1_unit == "원" else 1
-        )
-        st.session_state.net_income1_unit = net_income1_unit
-        
-        # 숫자 입력 컨테이너
-        st.markdown("<div class='number-input-container'>", unsafe_allow_html=True)
-        
-        # 입력값 변환 (천원 단위로 입력했다면 원 단위로 변환)
-        display_value = st.session_state.net_income1
-        if net_income1_unit == "천원":
-            display_value = display_value // 1000
-            
         net_income1 = st.number_input(
             "당기순이익 (원)", 
-            value=display_value, 
+            value=st.session_state.net_income1, 
             format="%d",
             help="가장 최근 연도의 당기순이익입니다. 3배 가중치가 적용됩니다.",
             key="income_year1_input",
             label_visibility="collapsed"
         )
-        
-        # 리셋 버튼 추가
-        reset_btn = st.button("✖", key="reset_net_income1", help="입력값 초기화")
-        if reset_btn:
-            if "income_year1_input" in st.session_state:
-                del st.session_state["income_year1_input"]
-                return
-            
-        st.markdown("</div>", unsafe_allow_html=True)
-        
-        # 실제 값 계산 (천원 단위로 입력했다면 원 단위로 변환)
-        actual_value = net_income1
-        if net_income1_unit == "천원":
-            actual_value = net_income1 * 1000
-            
-        # 세션 상태 업데이트
-        st.session_state.net_income1 = actual_value
-        
-        # 금액 표시
-        if net_income1_unit == "원":
-            st.markdown(f"<div class='amount-display'>금액: {format_number(actual_value)}원</div>", unsafe_allow_html=True)
-        else:
-            st.markdown(f"<div class='amount-display'>금액: {format_number(actual_value // 1000)}천원</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='amount-display'>금액: {format_number(net_income1, True)}원</div>", unsafe_allow_html=True)
+        # 설명 제거함
         
     with col2:
         st.markdown("##### 2년 전 (가중치 2배)")
-        
-        # 단위 선택 추가
-        net_income2_unit = st.radio(
-            "단위 선택 (2년 전)",
-            options=["원", "천원"],
-            horizontal=True,
-            key="net_income2_unit_radio",
-            label_visibility="collapsed",
-            index=0 if st.session_state.net_income2_unit == "원" else 1
-        )
-        st.session_state.net_income2_unit = net_income2_unit
-        
-        # 숫자 입력 컨테이너
-        st.markdown("<div class='number-input-container'>", unsafe_allow_html=True)
-        
-        # 입력값 변환 (천원 단위로 입력했다면 원 단위로 변환)
-        display_value = st.session_state.net_income2
-        if net_income2_unit == "천원":
-            display_value = display_value // 1000
-            
         net_income2 = st.number_input(
             "당기순이익 (원)", 
-            value=display_value, 
+            value=st.session_state.net_income2, 
             format="%d",
             help="2년 전 당기순이익입니다. 2배 가중치가 적용됩니다.",
             key="income_year2_input",
             label_visibility="collapsed"
         )
-        
-        # 리셋 버튼 추가
-        reset_btn = st.button("✖", key="reset_net_income2", help="입력값 초기화")
-        if reset_btn:
-            if "income_year2_input" in st.session_state:
-                del st.session_state["income_year2_input"]
-                return
-            
-        st.markdown("</div>", unsafe_allow_html=True)
-        
-        # 실제 값 계산 (천원 단위로 입력했다면 원 단위로 변환)
-        actual_value = net_income2
-        if net_income2_unit == "천원":
-            actual_value = net_income2 * 1000
-            
-        # 세션 상태 업데이트
-        st.session_state.net_income2 = actual_value
-        
-        # 금액 표시
-        if net_income2_unit == "원":
-            st.markdown(f"<div class='amount-display'>금액: {format_number(actual_value)}원</div>", unsafe_allow_html=True)
-        else:
-            st.markdown(f"<div class='amount-display'>금액: {format_number(actual_value // 1000)}천원</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='amount-display'>금액: {format_number(net_income2, True)}원</div>", unsafe_allow_html=True)
+        # 설명 제거함
         
     with col3:
         st.markdown("##### 3년 전 (가중치 1배)")
-        
-        # 단위 선택 추가
-        net_income3_unit = st.radio(
-            "단위 선택 (3년 전)",
-            options=["원", "천원"],
-            horizontal=True,
-            key="net_income3_unit_radio",
-            label_visibility="collapsed",
-            index=0 if st.session_state.net_income3_unit == "원" else 1
-        )
-        st.session_state.net_income3_unit = net_income3_unit
-        
-        # 숫자 입력 컨테이너
-        st.markdown("<div class='number-input-container'>", unsafe_allow_html=True)
-        
-        # 입력값 변환 (천원 단위로 입력했다면 원 단위로 변환)
-        display_value = st.session_state.net_income3
-        if net_income3_unit == "천원":
-            display_value = display_value // 1000
-            
         net_income3 = st.number_input(
             "당기순이익 (원)", 
-            value=display_value, 
+            value=st.session_state.net_income3, 
             format="%d",
             help="3년 전 당기순이익입니다. 1배 가중치가 적용됩니다.",
             key="income_year3_input",
             label_visibility="collapsed"
         )
-        
-        # 리셋 버튼 추가
-        reset_btn = st.button("✖", key="reset_net_income3", help="입력값 초기화")
-        if reset_btn:
-            if "income_year3_input" in st.session_state:
-                del st.session_state["income_year3_input"]
-                return
-            
-        st.markdown("</div>", unsafe_allow_html=True)
-        
-        # 실제 값 계산 (천원 단위로 입력했다면 원 단위로 변환)
-        actual_value = net_income3
-        if net_income3_unit == "천원":
-            actual_value = net_income3 * 1000
-            
-        # 세션 상태 업데이트
-        st.session_state.net_income3 = actual_value
-        
-        # 금액 표시
-        if net_income3_unit == "원":
-            st.markdown(f"<div class='amount-display'>금액: {format_number(actual_value)}원</div>", unsafe_allow_html=True)
-        else:
-            st.markdown(f"<div class='amount-display'>금액: {format_number(actual_value // 1000)}천원</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='amount-display'>금액: {format_number(net_income3, True)}원</div>", unsafe_allow_html=True)
+        # 설명 제거함
 
 # 주식 정보 입력
 with st.expander("주식 정보", expanded=True):
@@ -925,7 +708,6 @@ with st.expander("주식 정보", expanded=True):
     
     with col1:
         st.markdown("<div class='section-header'>총 발행주식수</div>", unsafe_allow_html=True)
-        
         shares = st.number_input(
             "총 발행주식수", 
             value=st.session_state.shares, 
@@ -935,12 +717,11 @@ with st.expander("주식 정보", expanded=True):
             key="shares_input",
             label_visibility="collapsed"
         )
-        
         st.markdown(f"<div class='amount-display'>총 {format_number(shares)}주</div>", unsafe_allow_html=True)
+        # 설명 제거함
         
     with col2:
         st.markdown("<div class='section-header'>액면금액 (원)</div>", unsafe_allow_html=True)
-        
         share_price = st.number_input(
             "액면금액 (원)", 
             value=st.session_state.share_price, 
@@ -950,12 +731,8 @@ with st.expander("주식 정보", expanded=True):
             key="share_price_input",
             label_visibility="collapsed"
         )
-        
-        # 세션 상태 업데이트
-        st.session_state.share_price = share_price
-        
-        # 금액 표시
         st.markdown(f"<div class='amount-display'>금액: {format_number(share_price)}원</div>", unsafe_allow_html=True)
+        # 설명 제거함
         
     with col3:
         st.markdown("<div class='section-header'>환원율</div>", unsafe_allow_html=True)
@@ -1001,9 +778,6 @@ with st.expander("주주 정보", expanded=True):
             )
         
         with col2:
-            # 숫자 입력 컨테이너
-            st.markdown("<div class='number-input-container'>", unsafe_allow_html=True)
-            
             shares_owned = st.number_input(
                 f"보유 주식수", 
                 value=st.session_state.shareholders[i]["shares"] if i < len(st.session_state.shareholders) else 0, 
@@ -1013,17 +787,6 @@ with st.expander("주주 정보", expanded=True):
                 key=f"shareholder_shares_input_{i}",
                 help=f"주주 {i+1}의 보유 주식수를 입력하세요."
             )
-            
-            # 리셋 버튼 추가
-            reset_btn = st.button("✖", key=f"reset_shareholder_shares_{i}", help="입력값 초기화")
-            if reset_btn:
-                key = f"shareholder_shares_input_{i}"
-                if key in st.session_state:
-                    del st.session_state[key]
-                    return
-                
-            st.markdown("</div>", unsafe_allow_html=True)
-            
             st.markdown(f"<div class='amount-display'>{format_number(shares_owned)}주</div>", unsafe_allow_html=True)
         
         # 구분선 추가
@@ -1090,13 +853,13 @@ if st.button("비상장주식 평가하기", type="primary", use_container_width
         # 세션 상태 업데이트
         st.session_state.eval_date = eval_date
         st.session_state.company_name = company_name
-        st.session_state.total_equity = st.session_state.total_equity
-        st.session_state.net_income1 = st.session_state.net_income1
-        st.session_state.net_income2 = st.session_state.net_income2
-        st.session_state.net_income3 = st.session_state.net_income3
+        st.session_state.total_equity = total_equity
+        st.session_state.net_income1 = net_income1
+        st.session_state.net_income2 = net_income2
+        st.session_state.net_income3 = net_income3
         st.session_state.shares = shares
         st.session_state.owned_shares = owned_shares
-        st.session_state.share_price = st.session_state.share_price
+        st.session_state.share_price = share_price
         st.session_state.interest_rate = 10  # 환원율 10% 고정
         st.session_state.evaluation_method = evaluation_method
         st.session_state.shareholders = shareholders
