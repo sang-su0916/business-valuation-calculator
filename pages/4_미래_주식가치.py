@@ -3,6 +3,8 @@ import pandas as pd
 import plotly.graph_objects as go
 import locale
 from datetime import datetime
+import io
+import base64
 
 # 숫자 형식화를 위한 로케일 설정
 try:
@@ -65,8 +67,221 @@ st.markdown("""
         margin: 15px 0;
         line-height: 1.5;
     }
+    .download-section {
+        background-color: #f0f7fb;
+        padding: 15px;
+        border-radius: 8px;
+        margin-top: 20px;
+    }
+    .warning-box {
+        background-color: #f8d7da;
+        color: #721c24;
+        padding: 15px;
+        border-radius: 5px;
+        margin: 15px 0;
+    }
+    .info-box-light {
+        background-color: #e2f0fb;
+        padding: 15px;
+        border-radius: 5px;
+        margin: 15px 0;
+        color: #0c5460;
+    }
 </style>
 """, unsafe_allow_html=True)
+
+# PDF 생성 함수
+def generate_pdf(current_value, future_value, company_name, growth_rate, future_years):
+    try:
+        # FPDF 라이브러리 자동 설치 시도
+        try:
+            from fpdf import FPDF
+        except ImportError:
+            try:
+                import subprocess
+                subprocess.check_call(['pip', 'install', 'fpdf'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                from fpdf import FPDF
+            except:
+                return None
+        
+        # PDF 객체 생성
+        pdf = FPDF()
+        pdf.add_page()
+        
+        # 기본 폰트 설정 (한글 지원 제한)
+        pdf.set_font('Arial', 'B', 16)
+        
+        # 제목
+        pdf.cell(190, 10, 'Future Stock Value Prediction Report', 0, 1, 'C')
+        pdf.ln(5)
+        
+        # 회사 정보
+        pdf.set_font('Arial', 'B', 12)
+        pdf.cell(190, 10, f'Company: {company_name}', 0, 1)
+        pdf.ln(5)
+        
+        # 예측 정보
+        pdf.set_font('Arial', '', 11)
+        pdf.cell(190, 10, f'Growth Rate: {growth_rate}% per year', 0, 1)
+        pdf.cell(190, 10, f'Prediction Period: {future_years} years', 0, 1)
+        pdf.ln(5)
+        
+        # 현재 및 미래 가치
+        pdf.set_font('Arial', 'B', 12)
+        pdf.cell(190, 10, 'Valuation Results:', 0, 1)
+        pdf.set_font('Arial', '', 11)
+        pdf.cell(190, 10, f'Current Value per Share: {format_number(current_value["finalValue"])} KRW', 0, 1)
+        pdf.cell(190, 10, f'Future Value per Share: {format_number(future_value["finalValue"])} KRW', 0, 1)
+        pdf.cell(190, 10, f'Current Total Company Value: {format_number(current_value["totalValue"])} KRW', 0, 1)
+        pdf.cell(190, 10, f'Future Total Company Value: {format_number(future_value["totalValue"])} KRW', 0, 1)
+        
+        # 증가율
+        value_increase = (future_value["finalValue"] / current_value["finalValue"] - 1) * 100
+        pdf.ln(5)
+        pdf.set_font('Arial', 'B', 11)
+        pdf.cell(190, 10, f'Expected Value Increase: +{value_increase:.1f}% (after {future_years} years)', 0, 1)
+        
+        # 생성일
+        pdf.ln(10)
+        pdf.set_font('Arial', 'I', 8)
+        pdf.cell(190, 10, f'Generated on: {datetime.now().strftime("%Y-%m-%d")}', 0, 1)
+        
+        # PDF를 바이트로 변환
+        try:
+            return pdf.output(dest='S').encode('latin-1')
+        except Exception as e:
+            return None
+    except Exception as e:
+        return None
+
+# HTML 다운로드용 내용 생성
+def create_html_content(current_value, future_value, company_name, growth_rate, future_years):
+    target_year = datetime.now().year + future_years
+    value_increase = (future_value["finalValue"] / current_value["finalValue"] - 1) * 100
+    
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <title>미래 주식가치 예측 보고서 - {company_name}</title>
+        <style>
+            body {{ font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; }}
+            h1 {{ color: #2c3e50; text-align: center; }}
+            h2 {{ color: #3498db; margin-top: 20px; }}
+            .info {{ margin-bottom: 5px; }}
+            .value-box {{ background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin: 10px 0; }}
+            .current {{ border-left: 4px solid #3498db; }}
+            .future {{ border-left: 4px solid #e67e22; }}
+            .result {{ margin-top: 10px; font-weight: bold; }}
+            .increase {{ color: #27ae60; font-weight: bold; font-size: 1.2em; }}
+            table {{ width: 100%; border-collapse: collapse; margin: 20px 0; }}
+            table, th, td {{ border: 1px solid #ddd; }}
+            th, td {{ padding: 12px; text-align: left; }}
+            th {{ background-color: #f2f2f2; }}
+        </style>
+    </head>
+    <body>
+        <h1>미래 주식가치 예측 보고서</h1>
+        
+        <h2>회사 정보</h2>
+        <div class="info">회사명: {company_name}</div>
+        
+        <h2>예측 정보</h2>
+        <div class="info">적용 성장률: 연 {growth_rate}% (복리)</div>
+        <div class="info">예측 기간: {future_years}년 (기준: {datetime.now().year}년 → 예측: {target_year}년)</div>
+        
+        <div class="value-box current">
+            <h3>현재 가치</h3>
+            <div class="info">주당 가치: {format_number(current_value["finalValue"])}원</div>
+            <div class="info">회사 총가치: {format_number(current_value["totalValue"])}원</div>
+        </div>
+        
+        <div class="value-box future">
+            <h3>미래 가치</h3>
+            <div class="info">주당 가치: {format_number(future_value["finalValue"])}원</div>
+            <div class="info">회사 총가치: {format_number(future_value["totalValue"])}원</div>
+        </div>
+        
+        <div style="text-align: center; margin: 20px 0;">
+            <p>예상 가치 증가율: <span class="increase">+{value_increase:.1f}%</span> ({future_years}년 후)</p>
+        </div>
+        
+        <h2>세부 계산 내역</h2>
+        <table>
+            <tr>
+                <th>항목</th>
+                <th>금액 (원)</th>
+            </tr>
+            <tr>
+                <td>미래 자본총계</td>
+                <td>{format_number(future_value["futureTotalEquity"])}</td>
+            </tr>
+            <tr>
+                <td>1주당 순자산가치</td>
+                <td>{format_number(future_value["netAssetPerShare"])}</td>
+            </tr>
+            <tr>
+                <td>1주당 손익가치</td>
+                <td>{format_number(future_value["incomeValue"])}</td>
+            </tr>
+            <tr>
+                <td>미래 주당 평가액</td>
+                <td>{format_number(future_value["finalValue"])}</td>
+            </tr>
+            <tr>
+                <td>미래 회사 총 주식가치</td>
+                <td>{format_number(future_value["totalValue"])}</td>
+            </tr>
+        </table>
+        
+        <div style="margin-top: 30px; padding: 10px; background-color: #edf7ed; border-radius: 5px;">
+            <p><b>참고:</b> 이 예측은 선택한 성장률이 일정하게 유지된다는 가정 하에 계산됩니다. 실제 기업의 성장은 다양한 요인에 따라 변동될 수 있습니다.</p>
+        </div>
+        
+        <div style="margin-top: 30px; text-align: center; color: #777; font-size: 0.9em;">
+            <p>생성일: {datetime.now().strftime('%Y년 %m월 %d일')}</p>
+        </div>
+    </body>
+    </html>
+    """
+    return html_content
+
+# CSV 다운로드용 내용 생성
+def create_csv_content(current_value, future_value, company_name, growth_rate, future_years):
+    # 현재 년도 계산
+    current_year = datetime.now().year
+    target_year = current_year + future_years
+    
+    # 가치 증가율 계산
+    value_increase = (future_value["finalValue"] / current_value["finalValue"] - 1) * 100
+    
+    # CSV 데이터 생성
+    data = {
+        '항목': [
+            '회사명', '성장률', '예측기간', 
+            '예측 시작 연도', '예측 종료 연도',
+            '현재 주당 가치', '미래 주당 가치', 
+            '현재 회사 총가치', '미래 회사 총가치',
+            '가치 증가율',
+            '미래 자본총계', '미래 1주당 순자산가치', 
+            '미래 1주당 손익가치', '미래 주당 평가액'
+        ],
+        '값': [
+            company_name, f"{growth_rate}%", f"{future_years}년",
+            str(current_year), str(target_year),
+            current_value["finalValue"], future_value["finalValue"],
+            current_value["totalValue"], future_value["totalValue"],
+            f"{value_increase:.1f}%",
+            future_value["futureTotalEquity"], future_value["netAssetPerShare"],
+            future_value["incomeValue"], future_value["finalValue"]
+        ]
+    }
+    
+    # DataFrame 생성 후 CSV로 변환
+    df = pd.DataFrame(data)
+    csv = df.to_csv(index=False).encode('utf-8')
+    return csv
 
 # 미래 주식가치 계산 함수
 def calculate_future_stock_value(stock_value, total_equity, shares, owned_shares, 
@@ -323,6 +538,58 @@ else:
                 <p>이 예측은 선택한 성장률이 일정하게 유지된다는 가정 하에 계산됩니다. 실제 기업 성장은 다양한 요인에 따라 변동될 수 있습니다.</p>
             </div>
             """, unsafe_allow_html=True)
+        
+        # 평가 결과 다운로드 섹션 추가
+        st.markdown("---")
+        with st.expander("📥 평가 결과 다운로드", expanded=False):
+            st.markdown("<div class='download-section'>", unsafe_allow_html=True)
+            tab1, tab2, tab3 = st.tabs(["PDF", "HTML", "CSV"])
+            
+            # PDF 다운로드 탭
+            with tab1:
+                if st.button("PDF 생성하기", key="generate_pdf", type="primary"):
+                    with st.spinner("PDF 생성 중..."):
+                        pdf_data = generate_pdf(stock_value, future_stock_value, company_name, growth_rate, future_years)
+                        
+                        if pdf_data:
+                            st.success("PDF 생성 완료!")
+                            st.download_button(
+                                label="📄 PDF 파일 다운로드",
+                                data=pdf_data,
+                                file_name=f"미래주식가치_{company_name}_{target_year}.pdf",
+                                mime="application/pdf"
+                            )
+                        else:
+                            st.warning("PDF 생성에 실패했습니다. HTML 형식으로 다운로드해보세요.")
+                            st.info("또는 'pip install fpdf fpdf2' 명령으로 필요한 라이브러리를 설치해보세요.")
+            
+            # HTML 다운로드 탭
+            with tab2:
+                if st.button("HTML 보고서 생성하기", key="generate_html"):
+                    html_content = create_html_content(stock_value, future_stock_value, company_name, growth_rate, future_years)
+                    
+                    st.download_button(
+                        label="📄 HTML 파일 다운로드",
+                        data=html_content,
+                        file_name=f"미래주식가치_{company_name}_{target_year}.html",
+                        mime="text/html"
+                    )
+                    
+                    st.info("HTML 파일을 다운로드 후 브라우저에서 열어 인쇄하면 PDF로 저장할 수 있습니다.")
+            
+            # CSV 다운로드 탭
+            with tab3:
+                if st.button("CSV 데이터 생성하기", key="generate_csv"):
+                    csv_content = create_csv_content(stock_value, future_stock_value, company_name, growth_rate, future_years)
+                    
+                    st.download_button(
+                        label="📄 CSV 파일 다운로드",
+                        data=csv_content,
+                        file_name=f"미래주식가치_{company_name}_{target_year}.csv",
+                        mime="text/csv"
+                    )
+            
+            st.markdown("</div>", unsafe_allow_html=True)
         
         # 미래 세금 계산 버튼
         if st.button("미래 세금 계산하기", type="primary", use_container_width=True):
