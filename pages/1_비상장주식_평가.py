@@ -143,6 +143,12 @@ def format_number(num, in_thousands=False):
             return "{:,}".format(int(num))
     except:
         return str(num)
+        
+# 사용자가 입력한 숫자에서 콤마 제거하는 함수
+def remove_commas(text):
+    if isinstance(text, str):
+        return text.replace(',', '')
+    return text
 
 # CSV 다운로드용 내용 생성
 def create_csv_content():
@@ -287,7 +293,7 @@ with st.expander("평가 기준일", expanded=True):
     
     with col1:
         eval_date = st.date_input(
-            "평가 기준일",
+            "",
             value=st.session_state.eval_date,
             help="비상장주식 평가의 기준이 되는 날짜입니다. 보통 결산일이나 평가가 필요한 시점으로 설정합니다.",
             key="eval_date_input"
@@ -329,15 +335,20 @@ with st.expander("회사 정보", expanded=True):
         if total_equity_unit == "천원":
             display_value = display_value // 1000
             
-        total_equity = st.number_input(
+        # 숫자 입력 대신 텍스트 입력으로 변경하여 콤마 입력 허용
+        total_equity_str = st.text_input(
             "자본총계", 
-            value=display_value, 
-            min_value=0, 
-            format="%d",
+            value=format_number(display_value), 
             help="평가 기준일 현재 회사의 대차대조표상 자본총계를 입력하세요.",
             key="total_equity_input",
             label_visibility="collapsed"
         )
+        
+        # 콤마 제거 후 숫자로 변환
+        try:
+            total_equity = int(remove_commas(total_equity_str))
+        except:
+            total_equity = 0
         
         # 실제 값 계산 (천원 단위로 입력했다면 원 단위로 변환)
         actual_value = total_equity
@@ -379,14 +390,19 @@ with st.expander("당기순이익 (최근 3개년)", expanded=True):
         if net_income1_unit == "천원":
             display_value = display_value // 1000
             
-        net_income1 = st.number_input(
+        net_income1_str = st.text_input(
             "당기순이익 (원)", 
-            value=display_value, 
-            format="%d",
+            value=format_number(display_value), 
             help="가장 최근 연도의 당기순이익입니다. 3배 가중치가 적용됩니다.",
             key="income_year1_input",
             label_visibility="collapsed"
         )
+        
+        # 콤마 제거 후 숫자로 변환
+        try:
+            net_income1 = int(remove_commas(net_income1_str))
+        except:
+            net_income1 = 0
         
         # 실제 값 계산 (천원 단위로 입력했다면 원 단위로 변환)
         actual_value = net_income1
@@ -421,14 +437,19 @@ with st.expander("당기순이익 (최근 3개년)", expanded=True):
         if net_income2_unit == "천원":
             display_value = display_value // 1000
             
-        net_income2 = st.number_input(
+        net_income2_str = st.text_input(
             "당기순이익 (원)", 
-            value=display_value, 
-            format="%d",
+            value=format_number(display_value), 
             help="2년 전 당기순이익입니다. 2배 가중치가 적용됩니다.",
             key="income_year2_input",
             label_visibility="collapsed"
         )
+        
+        # 콤마 제거 후 숫자로 변환
+        try:
+            net_income2 = int(remove_commas(net_income2_str))
+        except:
+            net_income2 = 0
         
         # 실제 값 계산 (천원 단위로 입력했다면 원 단위로 변환)
         actual_value = net_income2
@@ -463,14 +484,19 @@ with st.expander("당기순이익 (최근 3개년)", expanded=True):
         if net_income3_unit == "천원":
             display_value = display_value // 1000
             
-        net_income3 = st.number_input(
+        net_income3_str = st.text_input(
             "당기순이익 (원)", 
-            value=display_value, 
-            format="%d",
+            value=format_number(display_value), 
             help="3년 전 당기순이익입니다. 1배 가중치가 적용됩니다.",
             key="income_year3_input",
             label_visibility="collapsed"
         )
+        
+        # 콤마 제거 후 숫자로 변환
+        try:
+            net_income3 = int(remove_commas(net_income3_str))
+        except:
+            net_income3 = 0
         
         # 실제 값 계산 (천원 단위로 입력했다면 원 단위로 변환)
         actual_value = net_income3
@@ -493,30 +519,42 @@ with st.expander("주식 정보", expanded=True):
     with col1:
         st.markdown("<div class='section-header'>총 발행주식수</div>", unsafe_allow_html=True)
         
-        shares = st.number_input(
+        shares_str = st.text_input(
             "총 발행주식수", 
-            value=st.session_state.shares, 
-            min_value=1, 
-            format="%d",
+            value=format_number(st.session_state.shares), 
             help="회사가 발행한 총 주식수입니다.",
             key="shares_input",
             label_visibility="collapsed"
         )
+        
+        # 콤마 제거 후 숫자로 변환
+        try:
+            shares = int(remove_commas(shares_str))
+            if shares < 1:
+                shares = 1
+        except:
+            shares = 1
         
         st.markdown(f"<div class='amount-display'>총 {format_number(shares)}주</div>", unsafe_allow_html=True)
         
     with col2:
         st.markdown("<div class='section-header'>액면금액 (원)</div>", unsafe_allow_html=True)
         
-        share_price = st.number_input(
+        share_price_str = st.text_input(
             "액면금액 (원)", 
-            value=st.session_state.share_price, 
-            min_value=0, 
-            format="%d",
+            value=format_number(st.session_state.share_price), 
             help="주식 1주당 액면가액입니다. 일반적으로 100원, 500원, 1,000원, 5,000원 등으로 설정됩니다.",
             key="share_price_input",
             label_visibility="collapsed"
         )
+        
+        # 콤마 제거 후 숫자로 변환
+        try:
+            share_price = int(remove_commas(share_price_str))
+            if share_price < 0:
+                share_price = 0
+        except:
+            share_price = 0
         
         # 세션 상태 업데이트
         st.session_state.share_price = share_price
@@ -568,15 +606,22 @@ with st.expander("주주 정보", expanded=True):
             )
         
         with col2:
-            shares_owned = st.number_input(
+            shares_owned_str = st.text_input(
                 f"보유 주식수", 
-                value=st.session_state.shareholders[i]["shares"] if i < len(st.session_state.shareholders) else 0, 
-                min_value=0,
-                max_value=shares,
-                format="%d",
+                value=format_number(st.session_state.shareholders[i]["shares"] if i < len(st.session_state.shareholders) else 0),
                 key=f"shareholder_shares_input_{i}",
                 help=f"주주 {i+1}의 보유 주식수를 입력하세요."
             )
+            
+            # 콤마 제거 후 숫자로 변환
+            try:
+                shares_owned = int(remove_commas(shares_owned_str))
+                if shares_owned < 0:
+                    shares_owned = 0
+                if shares_owned > shares:
+                    shares_owned = shares
+            except:
+                shares_owned = 0
             
             st.markdown(f"<div class='amount-display'>{format_number(shares_owned)}주</div>", unsafe_allow_html=True)
         
