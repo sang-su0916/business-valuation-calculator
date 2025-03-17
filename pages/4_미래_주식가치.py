@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
+import plotly.express as px
 import locale
 from datetime import datetime
 import io
@@ -87,6 +88,13 @@ st.markdown("""
         margin: 15px 0;
         color: #0c5460;
     }
+    .yearly-progress {
+        background-color: #f5f9ff;
+        border: 1px solid #ddeaff;
+        border-radius: 5px;
+        padding: 15px;
+        margin: 20px 0;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -159,6 +167,31 @@ def create_html_content(current_value, future_value, company_name, growth_rate, 
     target_year = datetime.now().year + future_years
     value_increase = (future_value["finalValue"] / current_value["finalValue"] - 1) * 100
     
+    # 연도별 데이터가 있는 경우 테이블 데이터 생성
+    yearly_table = ""
+    if "yearlyEquity" in future_value and "yearlyIncome" in future_value:
+        yearly_table = """
+        <h2>연도별 성장 내역</h2>
+        <table>
+            <tr>
+                <th>연도</th>
+                <th>자본총계 (원)</th>
+                <th>가중평균 당기순이익 (원)</th>
+            </tr>
+        """
+        
+        current_year = datetime.now().year
+        for i in range(len(future_value["yearlyEquity"])):
+            yearly_table += f"""
+            <tr>
+                <td>{current_year + i}년</td>
+                <td>{format_number(future_value["yearlyEquity"][i])}</td>
+                <td>{format_number(future_value["yearlyIncome"][i])}</td>
+            </tr>
+            """
+            
+        yearly_table += "</table>"
+    
     html_content = f"""
     <!DOCTYPE html>
     <html>
@@ -188,7 +221,7 @@ def create_html_content(current_value, future_value, company_name, growth_rate, 
         <div class="info">회사명: {company_name}</div>
         
         <h2>예측 정보</h2>
-        <div class="info">적용 성장률: 연 {growth_rate}% (복리)</div>
+        <div class="info">적용 성장률: 연 {growth_rate}% (매년)</div>
         <div class="info">예측 기간: {future_years}년 (기준: {datetime.now().year}년 → 예측: {target_year}년)</div>
         
         <div class="value-box current">
@@ -206,6 +239,8 @@ def create_html_content(current_value, future_value, company_name, growth_rate, 
         <div style="text-align: center; margin: 20px 0;">
             <p>예상 가치 증가율: <span class="increase">+{value_increase:.1f}%</span> ({future_years}년 후)</p>
         </div>
+        
+        {yearly_table}
         
         <h2>세부 계산 내역</h2>
         <table>
@@ -236,7 +271,7 @@ def create_html_content(current_value, future_value, company_name, growth_rate, 
         </table>
         
         <div style="margin-top: 30px; padding: 10px; background-color: #edf7ed; border-radius: 5px;">
-            <p><b>참고:</b> 이 예측은 선택한 성장률이 일정하게 유지된다는 가정 하에 계산됩니다. 실제 기업의 성장은 다양한 요인에 따라 변동될 수 있습니다.</p>
+            <p><b>참고:</b> 이 예측은 매년 당기순이익이 성장률에 따라 증가하고, 그 순이익이 자본총계에 누적되는 방식으로 계산되었습니다.</p>
         </div>
         
         <div style="margin-top: 30px; text-align: center; color: #777; font-size: 0.9em;">
@@ -278,31 +313,75 @@ def create_csv_content(current_value, future_value, company_name, growth_rate, f
         ]
     }
     
-    # DataFrame 생성 후 CSV로 변환
-    df = pd.DataFrame(data)
-    csv = df.to_csv(index=False).encode('utf-8')
-    return csv
+    # 연도별 데이터가 있는 경우 추가
+    if "yearlyEquity" in future_value:
+        yearly_df = pd.DataFrame({
+            "연도": [current_year + i for i in range(len(future_value["yearlyEquity"]))],
+            "자본총계": future_value["yearlyEquity"],
+            "가중평균 당기순이익": future_value["yearlyIncome"]
+        })
+        
+        # 원본 DataFrame 생성
+        main_df = pd.DataFrame(data)
+        
+        # CSV로 변환 (둘 다 포함)
+        csv_bytes = io.BytesIO()
+        
+        # 기본 정보 먼저 저장
+        main_df.to_csv(csv_bytes, index=False, encoding='utf-8')
+        
+        # 그 다음에 빈 줄 추가
+        csv_bytes.write("\n\n".encode('utf-8'))
+        
+        # 연도별 데이터 추가
+        yearly_df.to_csv(csv_bytes, index=False, encoding='utf-8')
+        
+        # 처음으로 이동하고 내용 얻기
+        csv_bytes.seek(0)
+        return csv_bytes.getvalue()
+    else:
+        # DataFrame 생성 후 CSV로 변환
+        df = pd.DataFrame(data)
+        csv = df.to_csv(index=False).encode('utf-8')
+        return csv
 
-# 미래 주식가치 계산 함수
+# 미래 주식가치 계산 함수 (매년 누적 방식)
 def calculate_future_stock_value(stock_value, total_equity, shares, owned_shares, 
-                               interest_rate, evaluation_method, growth_rate, future_years):
+                             interest_rate, evaluation_method, growth_rate, future_years):
     if not stock_value:
         return None
     
-    # 복리 성장률 적용
-    growth_factor = (1 + (growth_rate / 100)) ** future_years
+    # 초기값 설정
+    current_total_equity = total_equity
+    current_weighted_income = stock_value["weightedIncome"]
     
-    # 미래 자산 및 수익 계산
-    future_total_equity = total_equity * growth_factor
-    future_weighted_income = stock_value["weightedIncome"] * growth_factor
+    # 연도별 값 저장할 리스트 (시각화용)
+    yearly_equity = [current_total_equity]
+    yearly_income = [current_weighted_income]
     
+    # 매년 순차적으로 계산
+    for year in range(1, future_years + 1):
+        # 당해 연도 순이익 계산 (성장률 적용)
+        current_income = current_weighted_income * (1 + (growth_rate / 100))
+        
+        # 자본총계 업데이트 (전년도 자본총계 + 당해 연도 순이익)
+        current_total_equity += current_income
+        
+        # 가중평균 순이익 업데이트
+        current_weighted_income = current_income
+        
+        # 값 저장
+        yearly_equity.append(current_total_equity)
+        yearly_income.append(current_weighted_income)
+    
+    # 최종 연도 기준으로 주식 가치 평가
     # 1. 순자산가치 계산
-    net_asset_per_share = future_total_equity / shares
+    net_asset_per_share = current_total_equity / shares
     
     # 2. 영업권 계산
-    weighted_income_per_share = future_weighted_income / shares
+    weighted_income_per_share = current_weighted_income / shares
     weighted_income_per_share_50 = weighted_income_per_share * 0.5
-    equity_return = (future_total_equity * (interest_rate / 100)) / shares
+    equity_return = (current_total_equity * (interest_rate / 100)) / shares
     annuity_factor = 3.7908
     goodwill = max(0, (weighted_income_per_share_50 - equity_return) * annuity_factor)
     
@@ -342,10 +421,12 @@ def calculate_future_stock_value(stock_value, total_equity, shares, owned_shares
         "totalValue": total_value,
         "ownedValue": owned_value,
         "methodText": method_text,
-        "futureTotalEquity": future_total_equity,
-        "futureWeightedIncome": future_weighted_income,
+        "futureTotalEquity": current_total_equity,
+        "futureWeightedIncome": current_weighted_income,
         "growthRate": growth_rate,
-        "futureYears": future_years
+        "futureYears": future_years,
+        "yearlyEquity": yearly_equity,
+        "yearlyIncome": yearly_income
     }
 
 # 페이지 헤더
@@ -381,8 +462,8 @@ else:
     st.markdown("""
     <div class="explanation-text">
         <p>기업 가치는 시간이 지남에 따라 성장할 수 있습니다. 이 페이지에서는 회사의 예상 성장률을 적용하여 
-        미래 시점의 주식 가치를 예측합니다. 성장률과 예측 기간을 선택하면 현재 가치를 기준으로 
-        미래 가치를 계산합니다.</p>
+        미래 시점의 주식 가치를 예측합니다. 성장률과 예측 기간을 선택하면 
+        <strong>매년 자본총계에 순이익이 누적되는 방식으로</strong> 미래 가치를 계산합니다.</p>
         <p>계산된 미래 가치는 현재 가치와 함께 비교 차트로 표시되며, 성장에 따른 가치 증가율도 확인할 수 있습니다.</p>
     </div>
     """, unsafe_allow_html=True)
@@ -403,7 +484,7 @@ else:
                 index=1,  # 기본값 10%
                 help="회사의 연평균 성장률 예상치입니다. 과거 실적과 미래 전망을 고려하여 선택하세요."
             )
-            st.markdown(f"<small>선택한 성장률 {growth_rate}%는 매년 복리로 적용됩니다.</small>", unsafe_allow_html=True)
+            st.markdown(f"<small>선택한 성장률 {growth_rate}%는 매년 당기순이익에 적용됩니다.</small>", unsafe_allow_html=True)
         
         with col2:
             future_years = st.selectbox(
@@ -424,7 +505,7 @@ else:
     # 계산 버튼
     if st.button("미래 가치 계산하기", type="primary", use_container_width=True):
         with st.spinner("계산 중..."):
-            # 미래 주식 가치 계산
+            # 미래 주식 가치 계산 (매년 누적 방식)
             st.session_state.future_stock_value = calculate_future_stock_value(
                 stock_value, total_equity, shares, owned_shares, 
                 interest_rate, evaluation_method, growth_rate, future_years
@@ -449,7 +530,7 @@ else:
             <ul>
                 <li><b>기준 시점:</b> {datetime.now().year}년</li>
                 <li><b>예측 시점:</b> {target_year}년 ({future_years}년 후)</li>
-                <li><b>적용 성장률:</b> 연 {growth_rate}% (복리)</li>
+                <li><b>적용 성장률:</b> 연 {growth_rate}% (매년 적용)</li>
                 <li><b>적용 평가방식:</b> {future_stock_value['methodText']}</li>
             </ul>
         </div>
@@ -478,23 +559,79 @@ else:
         </div>
         """, unsafe_allow_html=True)
         
-        # 차트 표시 - 현재와 미래 가치 비교
+        # 차트 1: 현재와 미래 가치 비교 (바 차트)
         st.markdown("<div class='chart-container'>", unsafe_allow_html=True)
-        fig = go.Figure()
-        fig.add_trace(go.Bar(
+        fig1 = go.Figure()
+        fig1.add_trace(go.Bar(
             x=['현재', f'{future_years}년 후'],
             y=[stock_value["finalValue"], future_stock_value["finalValue"]],
             marker_color=['lightblue', 'orange'],
             text=[format_number(stock_value["finalValue"]), format_number(future_stock_value["finalValue"])],
             textposition='auto'
         ))
-        fig.update_layout(
+        fig1.update_layout(
             title='주당 가치 비교',
             yaxis_title='주당 가치 (원)',
             height=400
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig1, use_container_width=True)
         st.markdown("</div>", unsafe_allow_html=True)
+        
+        # 차트 2: 연도별 자본총계와 가중평균 순이익 추이 (라인 차트)
+        if "yearlyEquity" in future_stock_value and "yearlyIncome" in future_stock_value:
+            st.markdown("<div class='yearly-progress'>", unsafe_allow_html=True)
+            st.subheader("연도별 자본총계 및 순이익 추이")
+            
+            # 연도 레이블 생성
+            years = [datetime.now().year + i for i in range(len(future_stock_value["yearlyEquity"]))]
+            
+            # 라인 차트 생성
+            fig2 = go.Figure()
+            
+            # 자본총계 추이
+            fig2.add_trace(go.Scatter(
+                x=years,
+                y=future_stock_value["yearlyEquity"],
+                mode='lines+markers',
+                name='자본총계',
+                line=dict(color='royalblue', width=3),
+                marker=dict(size=8)
+            ))
+            
+            # 당기순이익 추이
+            fig2.add_trace(go.Scatter(
+                x=years,
+                y=future_stock_value["yearlyIncome"],
+                mode='lines+markers',
+                name='가중평균 당기순이익',
+                line=dict(color='darkorange', width=3, dash='dot'),
+                marker=dict(size=8)
+            ))
+            
+            # 차트 레이아웃 설정
+            fig2.update_layout(
+                title='연도별 자본총계 및 순이익 추이',
+                xaxis_title='연도',
+                yaxis_title='금액 (원)',
+                legend=dict(x=0.01, y=0.99, bgcolor='rgba(255,255,255,0.8)'),
+                height=500
+            )
+            
+            st.plotly_chart(fig2, use_container_width=True)
+            
+            # 연도별 데이터 테이블 표시
+            st.subheader("연도별 상세 데이터")
+            
+            yearly_df = pd.DataFrame({
+                "연도": years,
+                "자본총계 (원)": [format_number(val) for val in future_stock_value["yearlyEquity"]],
+                "가중평균 당기순이익 (원)": [format_number(val) for val in future_stock_value["yearlyIncome"]]
+            })
+            
+            st.table(yearly_df)
+            
+            st.markdown("<div class='explanation-text'>위 테이블은 매년 당기순이익이 누적되어 자본총계가 증가하는 과정을 보여줍니다. 당기순이익은 매년 성장률에 따라 증가합니다.</div>", unsafe_allow_html=True)
+            st.markdown("</div>", unsafe_allow_html=True)
         
         # 성장 세부 내역
         with st.expander("미래 가치 계산 세부내역", expanded=False):
@@ -531,11 +668,12 @@ else:
             <div class="explanation-text">
                 <p><b>계산 방법 설명:</b></p>
                 <ol>
-                    <li>선택한 연평균 성장률을 복리로 적용하여 미래 자본총계와 가중평균 당기순이익을 계산합니다.</li>
-                    <li>계산된 미래 자산과 수익을 기반으로 비상장주식 평가방법을 적용합니다.</li>
+                    <li>매년 순이익은 선택한 성장률에 따라 증가합니다.</li>
+                    <li>매년 자본총계는 전년도 자본총계에 당해 연도 순이익을 더해 계산합니다.</li>
+                    <li>최종 연도의 자본총계와 당기순이익을 기준으로 비상장주식 평가방법을 적용합니다.</li>
                     <li>적용된 평가방법에 따라 최종 주당 가치와 회사 총가치를 산출합니다.</li>
                 </ol>
-                <p>이 예측은 선택한 성장률이 일정하게 유지된다는 가정 하에 계산됩니다. 실제 기업 성장은 다양한 요인에 따라 변동될 수 있습니다.</p>
+                <p>이 예측은 회사가 매년 성장률에 따라 꾸준히 성장하고, 이익이 자본총계에 지속적으로 누적된다는 가정 하에 계산됩니다.</p>
             </div>
             """, unsafe_allow_html=True)
         
