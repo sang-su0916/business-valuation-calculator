@@ -361,10 +361,13 @@ def calculate_transfer_tax(gain, acquisition_value):
     
     return tax, calculation_steps, effective_rate, transfer_profit
 
-# 청산소득세 계산 함수
-def calculate_liquidation_tax(income, acquisition_value, is_family_corp=False):
+# 청산소득세 계산 함수 - 수정: 청산소득금액 계산 추가
+def calculate_liquidation_tax(total_value, acquisition_value, is_family_corp=False):
+    # 청산소득금액 계산 - 자기자본(취득가액) 차감
+    income = total_value - acquisition_value
+    
     calculation_steps = []
-    calculation_steps.append({"description": "청산소득금액", "detail": f"{simple_format(income)}원 (잔여재산 - 자기자본 {simple_format(acquisition_value)}원)"})
+    calculation_steps.append({"description": "청산소득금액", "detail": f"보유주식가치({simple_format(total_value)}원) - 자기자본({simple_format(acquisition_value)}원) = {simple_format(income)}원"})
     
     # 법인세 계산
     if is_family_corp:
@@ -404,7 +407,7 @@ def calculate_liquidation_tax(income, acquisition_value, is_family_corp=False):
     # 실효세율 계산
     effective_rate = (total_tax / income) * 100 if income > 0 else 0
     
-    return corporate_tax, dividend_tax, total_tax, calculation_steps, effective_rate
+    return corporate_tax, dividend_tax, total_tax, calculation_steps, effective_rate, income
 
 # 세금 계산 함수 (수정)
 def calculate_tax_details(value, owned_shares, share_price, is_family_corp=False):
@@ -420,8 +423,8 @@ def calculate_tax_details(value, owned_shares, share_price, is_family_corp=False
     acquisition_value = owned_shares * share_price
     transfer_tax, transfer_steps, transfer_rate, transfer_profit = calculate_transfer_tax(owned_value, acquisition_value)
     
-    # 청산소득세
-    corporate_tax, dividend_tax, total_liquidation_tax, liquidation_steps, liquidation_rate = calculate_liquidation_tax(owned_value, acquisition_value, is_family_corp)
+    # 청산소득세 - 수정된 함수 사용
+    corporate_tax, dividend_tax, total_liquidation_tax, liquidation_steps, liquidation_rate, liquidation_income = calculate_liquidation_tax(owned_value, acquisition_value, is_family_corp)
     
     return {
         "inheritanceTax": inheritance_tax,
@@ -434,7 +437,8 @@ def calculate_tax_details(value, owned_shares, share_price, is_family_corp=False
         "transferRate": transfer_rate,
         "liquidationRate": liquidation_rate,
         "acquisitionValue": acquisition_value,
-        "transferProfit": transfer_profit
+        "transferProfit": transfer_profit,
+        "liquidationIncome": liquidation_income
     }
 
 # 메인 코드
@@ -536,7 +540,7 @@ else:
         st.markdown(f"<p><b>총 양도소득세(지방소득세 포함): {simple_format(tax_details['transferTax'])}원</b> (실효세율: {tax_details['transferRate']:.1f}%)</p>", unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
     
-    # 청산소득세 계산 세부내역
+    # 청산소득세 계산 세부내역 (수정됨)
     with st.expander("청산소득세 계산 세부내역"):
         st.markdown("<div class='calculation-box'>", unsafe_allow_html=True)
         
@@ -723,6 +727,7 @@ else:
                     <div class="info">주당 평가액: {simple_format(stock_value["finalValue"])}원</div>
                     <div class="info">회사 총 가치: {simple_format(stock_value["totalValue"])}원</div>
                     <div class="info">대표이사 보유주식 가치: {simple_format(stock_value["ownedValue"])}원</div>
+                    <div class="info">취득가액(자기자본): {simple_format(tax_details["acquisitionValue"])}원</div>
                     
                     <h2>세금 분석 결과</h2>
                     <table class="results-table">
@@ -806,14 +811,14 @@ else:
                 # CSV 데이터 생성
                 data = {
                     '항목': [
-                        '회사명', '평가 기준일', '주당 평가액', '회사 총가치', '대표이사 보유주식 가치',
+                        '회사명', '평가 기준일', '주당 평가액', '회사 총가치', '대표이사 보유주식 가치', '취득가액(자기자본)',
                         '증여세', '증여세 실효세율', 
                         '양도소득세(지방소득세 포함)', '양도소득세 실효세율', 
                         '청산소득세', '청산소득세 실효세율',
                         '최적 세금 옵션'
                     ],
                     '값': [
-                        company_name, str(eval_date), stock_value['finalValue'], stock_value['totalValue'], stock_value['ownedValue'],
+                        company_name, str(eval_date), stock_value['finalValue'], stock_value['totalValue'], stock_value['ownedValue'], tax_details['acquisitionValue'],
                         tax_details['inheritanceTax'], f"{tax_details['inheritanceRate']:.1f}%",
                         tax_details['transferTax'], f"{tax_details['transferRate']:.1f}%",
                         tax_details['liquidationTax'], f"{tax_details['liquidationRate']:.1f}%",
