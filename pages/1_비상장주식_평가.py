@@ -79,34 +79,25 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# 앱이 처음 실행될 때만 초기화하는 플래그
+if 'initialized' not in st.session_state:
+    st.session_state.initialized = False
+
 # 세션 상태 초기화
-if 'eval_date' not in st.session_state:
+if not st.session_state.initialized:
     st.session_state.eval_date = datetime.now().date()
-if 'company_name' not in st.session_state:
     st.session_state.company_name = "엘비즈"
-if 'total_equity' not in st.session_state:
     st.session_state.total_equity = 1000000000
-if 'net_income1' not in st.session_state:
     st.session_state.net_income1 = 400000000
-if 'net_income2' not in st.session_state:
     st.session_state.net_income2 = 300000000
-if 'net_income3' not in st.session_state:
     st.session_state.net_income3 = 250000000
-if 'shares' not in st.session_state:
     st.session_state.shares = 10000
-if 'owned_shares' not in st.session_state:
     st.session_state.owned_shares = 8000
-if 'share_price' not in st.session_state:
     st.session_state.share_price = 5000
-if 'interest_rate' not in st.session_state:
     st.session_state.interest_rate = 10  # 환원율 10%로 고정
-if 'evaluation_method' not in st.session_state:
     st.session_state.evaluation_method = "일반법인"
-if 'stock_value' not in st.session_state:
     st.session_state.stock_value = None
-if 'evaluated' not in st.session_state:
     st.session_state.evaluated = False
-if 'shareholders' not in st.session_state:
     st.session_state.shareholders = [
         {"name": "대표이사", "shares": 8000},
         {"name": "", "shares": 0},
@@ -114,18 +105,22 @@ if 'shareholders' not in st.session_state:
         {"name": "", "shares": 0},
         {"name": "", "shares": 0}
     ]
-if 'shareholder_count' not in st.session_state:
     st.session_state.shareholder_count = 1
     
-# 단위 옵션 세션 상태 초기화
-if 'total_equity_unit' not in st.session_state:
+    # 단위 옵션 세션 상태 초기화
     st.session_state.total_equity_unit = "원"
-if 'net_income1_unit' not in st.session_state:
     st.session_state.net_income1_unit = "원"
-if 'net_income2_unit' not in st.session_state:
     st.session_state.net_income2_unit = "원"
-if 'net_income3_unit' not in st.session_state:
     st.session_state.net_income3_unit = "원"
+    
+    # 초기화 완료
+    st.session_state.initialized = True
+
+# 사용자가 입력한 숫자에서 콤마 제거하는 함수
+def remove_commas(text):
+    if isinstance(text, str):
+        return text.replace(',', '')
+    return text
 
 # 단위에 맞게 표시 형식 변환
 def format_by_unit(value, unit):
@@ -143,12 +138,6 @@ def format_number(num, in_thousands=False):
             return "{:,}".format(int(num))
     except:
         return str(num)
-        
-# 사용자가 입력한 숫자에서 콤마 제거하는 함수
-def remove_commas(text):
-    if isinstance(text, str):
-        return text.replace(',', '')
-    return text
 
 # CSV 다운로드용 내용 생성
 def create_csv_content():
@@ -535,6 +524,9 @@ with st.expander("주식 정보", expanded=True):
         except:
             shares = 1
         
+        # 세션 상태 업데이트
+        st.session_state.shares = shares
+        
         st.markdown(f"<div class='amount-display'>총 {format_number(shares)}주</div>", unsafe_allow_html=True)
         
     with col2:
@@ -656,6 +648,10 @@ with st.expander("주주 정보", expanded=True):
     
     # 대표이사 보유 주식수 설정
     owned_shares = shareholders[0]["shares"] if shareholders and shareholders[0]["name"] else 0
+    
+    # 세션 상태 업데이트
+    st.session_state.shareholders = shareholders
+    st.session_state.owned_shares = owned_shares
 
 # 평가 방식 선택
 with st.expander("평가 방식 선택", expanded=True):
