@@ -83,19 +83,19 @@ st.markdown("""
 if 'eval_date' not in st.session_state:
     st.session_state.eval_date = datetime.now().date()
 if 'company_name' not in st.session_state:
-    st.session_state.company_name = "주식회사 에이비씨"
+    st.session_state.company_name = "엘비즈"
 if 'total_equity' not in st.session_state:
     st.session_state.total_equity = 1000000000
 if 'net_income1' not in st.session_state:
-    st.session_state.net_income1 = 386650000
+    st.session_state.net_income1 = 400000000
 if 'net_income2' not in st.session_state:
-    st.session_state.net_income2 = 163401000
+    st.session_state.net_income2 = 300000000
 if 'net_income3' not in st.session_state:
-    st.session_state.net_income3 = 75794000
+    st.session_state.net_income3 = 250000000
 if 'shares' not in st.session_state:
-    st.session_state.shares = 4000
+    st.session_state.shares = 10000
 if 'owned_shares' not in st.session_state:
-    st.session_state.owned_shares = 2000
+    st.session_state.owned_shares = 8000
 if 'share_price' not in st.session_state:
     st.session_state.share_price = 5000
 if 'interest_rate' not in st.session_state:
@@ -108,7 +108,7 @@ if 'evaluated' not in st.session_state:
     st.session_state.evaluated = False
 if 'shareholders' not in st.session_state:
     st.session_state.shareholders = [
-        {"name": "대표이사", "shares": 2000},
+        {"name": "대표이사", "shares": 8000},
         {"name": "", "shares": 0},
         {"name": "", "shares": 0},
         {"name": "", "shares": 0},
