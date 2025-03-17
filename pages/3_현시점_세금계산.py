@@ -383,7 +383,7 @@ def calculate_transfer_tax(gain, acquisition_value):
     
     return total_tax, calculation_steps, effective_rate, transfer_profit
 
-# 청산소득세 계산 함수 - 첨부 자료 기준으로 완전히 새로 구현
+# 청산소득세 계산 함수 - 첨부 자료 기준으로 완전히 새로 구현, 법인세율 9%, 19% 적용
 def calculate_liquidation_tax(owned_value, acquisition_value, total_value, total_shares, owned_shares, is_family_corp=False):
     calculation_steps = []
     
@@ -398,13 +398,20 @@ def calculate_liquidation_tax(owned_value, acquisition_value, total_value, total
     corporate_income = company_value - capital
     calculation_steps.append({"description": "청산소득금액", "detail": f"잔여재산가액({simple_format(company_value)}원) - 자기자본총액({simple_format(capital)}원) = {simple_format(corporate_income)}원"})
     
-    # 법인세 계산
-    if corporate_income <= 300000000:  # 3억원 이하
-        corporate_tax = corporate_income * 0.20
-        calculation_steps.append({"description": "법인세(3억 이하)", "detail": f"{simple_format(corporate_income)}원 × 20% = {simple_format(corporate_tax)}원"})
-    else:  # 3억원 초과
-        corporate_tax = 300000000 * 0.20 + (corporate_income - 300000000) * 0.22
-        calculation_steps.append({"description": "법인세", "detail": f"3억원 × 20% + {simple_format(corporate_income - 300000000)}원 × 22% = {simple_format(corporate_tax)}원"})
+    # 법인세 계산 - 새로운 세율 적용
+    if not is_family_corp:
+        # 일반법인 세율 적용
+        if corporate_income <= 200000000:  # 2억원 이하
+            corporate_tax = corporate_income * 0.09
+            calculation_steps.append({"description": "법인세(2억 이하)", "detail": f"{simple_format(corporate_income)}원 × 9% = {simple_format(corporate_tax)}원"})
+        else:  # 2억원 초과
+            # 2억원까지는 9%, 나머지는 19% 적용
+            corporate_tax = 200000000 * 0.09 + (corporate_income - 200000000) * 0.19
+            calculation_steps.append({"description": "법인세", "detail": f"2억원 × 9% + {simple_format(corporate_income - 200000000)}원 × 19% = {simple_format(corporate_tax)}원"})
+    else:
+        # 가족법인 세율 적용
+        corporate_tax = corporate_income * 0.19  # 가족법인은 19% 고정 세율 적용
+        calculation_steps.append({"description": "법인세(가족법인)", "detail": f"{simple_format(corporate_income)}원 × 19% = {simple_format(corporate_tax)}원"})
     
     # 2단계: 주주 단계 - 잔여재산 분배에 대한 종합소득세
     # 법인세 납부 후 잔여재산
@@ -553,7 +560,7 @@ else:
         st.markdown("<div class='tax-card'>", unsafe_allow_html=True)
         st.markdown("<div class='tax-title'>청산소득세(종합소득세 포함)</div>", unsafe_allow_html=True)
         st.markdown(f"<div class='tax-amount'>{simple_format(tax_details['liquidationTax'])}원</div>", unsafe_allow_html=True)
-        st.markdown(f"<div class='tax-rate'>법인: 20~22% + 개인: 45%</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='tax-rate'>법인: 9~19% + 개인: 45%</div>", unsafe_allow_html=True)
         st.markdown("<div class='tax-description'>법인 청산 시 발생하는 세금으로, 법인세와 잔여재산 분배에 따른 종합소득세로 구성됩니다.</div>", unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
     
@@ -586,7 +593,7 @@ else:
         st.markdown("<p><b>청산소득세 (법인세+종합소득세)</b></p>", unsafe_allow_html=True)
         st.markdown(f"<p>법인: {simple_format(tax_details['corporateIncome'])}원</p>", unsafe_allow_html=True)
         st.markdown(f"<p>개인: {simple_format(tax_details['individualDistribution'])}원</p>", unsafe_allow_html=True)
-        st.markdown(f"<p>법인: 20~22% 개인: 45%</p>", unsafe_allow_html=True)
+        st.markdown(f"<p>법인: 9~19% 개인: 45%</p>", unsafe_allow_html=True)
         
         for step in tax_details['liquidationSteps']:
             st.markdown(f"<div class='calculation-step'>{step['description']}: {step['detail']}</div>", unsafe_allow_html=True)
@@ -627,7 +634,7 @@ else:
     </div>
     """, unsafe_allow_html=True)
     
-    # 세금 비교 테이블 (균형있게) - 양도소득세 표시 수정
+    # 세금 비교 테이블 (균형있게) - 수정된 명칭 적용
     st.markdown(f"""
     <table class="tax-compare-table">
         <thead>
@@ -679,7 +686,7 @@ else:
         st.markdown("<li>기본공제: 250만원</li>", unsafe_allow_html=True)
         st.markdown("</ul>", unsafe_allow_html=True)
         
-        # 법인세율 테이블 - 2025년 세법 변경 반영
+        # 법인세율 테이블 - 2025년 세법 변경 반영, 9%와 19%로 업데이트
         st.markdown("<h4>일반법인 세율 (2025년 기준)</h4>", unsafe_allow_html=True)
         st.markdown("""
         <table class="balanced-table">
@@ -869,7 +876,7 @@ else:
                         <h3>청산소득세(종합소득세 포함) 계산</h3>
                         <p>법인: {simple_format(tax_details['corporateIncome'])}원</p>
                         <p>개인: {simple_format(tax_details['individualDistribution'])}원</p>
-                        <p>법인: 20~22% 개인: 45%</p>
+                        <p>법인: 9~19% 개인: 45%</p>
                         <ul>
                             {''.join([f"<li>{step['description']}: {step['detail']}</li>" for step in tax_details['liquidationSteps']])}
                         </ul>
