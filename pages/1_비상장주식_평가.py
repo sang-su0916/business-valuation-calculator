@@ -88,9 +88,9 @@ if not st.session_state.initialized:
     st.session_state.eval_date = datetime.now().date()
     st.session_state.company_name = "엘비즈"
     st.session_state.total_equity = 1000000000
-    st.session_state.net_income1 = 400000000
-    st.session_state.net_income2 = 300000000
-    st.session_state.net_income3 = 250000000
+    st.session_state.net_income1 = 450000000
+    st.session_state.net_income2 = 400000000
+    st.session_state.net_income3 = 370000000
     st.session_state.shares = 10000
     st.session_state.owned_shares = 8000
     st.session_state.share_price = 5000
@@ -107,11 +107,11 @@ if not st.session_state.initialized:
     ]
     st.session_state.shareholder_count = 1
     
-    # 단위 옵션 세션 상태 초기화
-    st.session_state.total_equity_unit = "원"
-    st.session_state.net_income1_unit = "원"
-    st.session_state.net_income2_unit = "원"
-    st.session_state.net_income3_unit = "원"
+    # 단위 옵션 세션 상태 초기화 - 천원으로 기본 설정
+    st.session_state.total_equity_unit = "천원"
+    st.session_state.net_income1_unit = "천원"
+    st.session_state.net_income2_unit = "천원"
+    st.session_state.net_income3_unit = "천원"
     
     # 초기화 완료
     st.session_state.initialized = True
@@ -315,7 +315,7 @@ with st.expander("회사 정보", expanded=True):
             horizontal=True,
             key="total_equity_unit_radio",
             label_visibility="collapsed",
-            index=0 if st.session_state.total_equity_unit == "원" else 1
+            index=1 if st.session_state.total_equity_unit == "천원" else 0
         )
         st.session_state.total_equity_unit = total_equity_unit
         
@@ -370,7 +370,7 @@ with st.expander("당기순이익 (최근 3개년)", expanded=True):
             horizontal=True,
             key="net_income1_unit_radio",
             label_visibility="collapsed",
-            index=0 if st.session_state.net_income1_unit == "원" else 1
+            index=1 if st.session_state.net_income1_unit == "천원" else 0
         )
         st.session_state.net_income1_unit = net_income1_unit
         
@@ -417,7 +417,7 @@ with st.expander("당기순이익 (최근 3개년)", expanded=True):
             horizontal=True,
             key="net_income2_unit_radio",
             label_visibility="collapsed",
-            index=0 if st.session_state.net_income2_unit == "원" else 1
+            index=1 if st.session_state.net_income2_unit == "천원" else 0
         )
         st.session_state.net_income2_unit = net_income2_unit
         
@@ -464,7 +464,7 @@ with st.expander("당기순이익 (최근 3개년)", expanded=True):
             horizontal=True,
             key="net_income3_unit_radio",
             label_visibility="collapsed",
-            index=0 if st.session_state.net_income3_unit == "원" else 1
+            index=1 if st.session_state.net_income3_unit == "천원" else 0
         )
         st.session_state.net_income3_unit = net_income3_unit
         
