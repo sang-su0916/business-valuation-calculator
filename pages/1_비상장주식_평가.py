@@ -14,41 +14,6 @@ import locale
 from datetime import datetime
 import io
 import base64
-import re
-import json
-
-# FPDF 라이브러리 추가 (PDF 생성용)
-try:
-    from fpdf import FPDF
-    FPDF_AVAILABLE = True
-except ImportError:
-    try:
-        # pip으로 설치 시도
-        import subprocess
-        subprocess.check_call(['pip', 'install', 'fpdf'])
-        from fpdf import FPDF
-        FPDF_AVAILABLE = True
-    except:
-        FPDF_AVAILABLE = False
-
-# 파일 처리 라이브러리
-try:
-    import docx
-    DOCX_AVAILABLE = True
-except ImportError:
-    DOCX_AVAILABLE = False
-
-try:
-    import PyPDF2
-    PYPDF2_AVAILABLE = True
-except ImportError:
-    PYPDF2_AVAILABLE = False
-
-try:
-    import openpyxl
-    XLSX_AVAILABLE = True
-except ImportError:
-    XLSX_AVAILABLE = False
 
 # 숫자 형식화를 위한 로케일 설정
 try:
@@ -92,12 +57,6 @@ st.markdown("""
         font-size: 1.1rem;
         margin-bottom: 0.5rem;
         color: #333;
-    }
-    .upload-section {
-        background-color: #f8f9fa;
-        padding: 15px;
-        border-radius: 8px;
-        margin-bottom: 15px;
     }
     .download-section {
         background-color: #f0f7fb;
@@ -168,12 +127,6 @@ if 'net_income2_unit' not in st.session_state:
 if 'net_income3_unit' not in st.session_state:
     st.session_state.net_income3_unit = "원"
 
-# 단위 변환 함수
-def convert_to_base_unit(value, unit):
-    if unit == "천원":
-        return value * 1000
-    return value
-
 # 단위에 맞게 표시 형식 변환
 def format_by_unit(value, unit):
     if unit == "천원":
@@ -191,278 +144,32 @@ def format_number(num, in_thousands=False):
     except:
         return str(num)
 
-# 정규식 패턴으로 데이터 찾기
-def find_with_patterns(text, patterns):
-    for pattern in patterns:
-        matches = re.findall(pattern, text, re.IGNORECASE)
-        if matches:
-            # 숫자만 추출
-            for match in matches:
-                num_str = re.sub(r'[^\d]', '', match)
-                if num_str:
-                    return int(num_str)
-    return None
-
-# 파일에서 데이터 추출
-def extract_data_from_file(uploaded_file):
-    extracted_data = {}
-    
-    # 파일 확장자 확인
-    file_ext = uploaded_file.name.split('.')[-1].lower()
-    
-    # 텍스트 추출
-    text_content = ""
-    
-    # Excel 파일 처리
-    if file_ext in ['xlsx', 'xls'] and XLSX_AVAILABLE:
-        try:
-            df = pd.read_excel(uploaded_file)
-            # DataFrame을 텍스트로 변환
-            text_content = df.to_string()
-            
-            # 열 이름으로 데이터 찾기
-            for col in df.columns:
-                col_lower = col.lower()
-                if '회사' in col_lower or 'company' in col_lower:
-                    for idx, val in df[col].items():
-                        if isinstance(val, str) and len(val) > 1:
-                            extracted_data['company_name'] = val
-                            break
-                
-                if '자본' in col_lower or 'capital' in col_lower or 'equity' in col_lower:
-                    for idx, val in df[col].items():
-                        if isinstance(val, (int, float)) and val > 0:
-                            extracted_data['total_equity'] = int(val)
-                            break
-                
-                if '당기순이익' in col_lower or 'profit' in col_lower or 'income' in col_lower:
-                    profit_values = [val for idx, val in df[col].items() 
-                                    if isinstance(val, (int, float)) and val > 0]
-                    if len(profit_values) >= 3:
-                        extracted_data['net_income1'] = int(profit_values[0])
-                        extracted_data['net_income2'] = int(profit_values[1])
-                        extracted_data['net_income3'] = int(profit_values[2])
-                    elif len(profit_values) == 2:
-                        extracted_data['net_income1'] = int(profit_values[0])
-                        extracted_data['net_income2'] = int(profit_values[1])
-                    elif len(profit_values) == 1:
-                        extracted_data['net_income1'] = int(profit_values[0])
-                
-                if '주식' in col_lower or 'shares' in col_lower:
-                    for idx, val in df[col].items():
-                        if isinstance(val, (int, float)) and val > 0:
-                            extracted_data['shares'] = int(val)
-                            break
-                
-                if '액면' in col_lower or 'face' in col_lower:
-                    for idx, val in df[col].items():
-                        if isinstance(val, (int, float)) and val > 0:
-                            extracted_data['share_price'] = int(val)
-                            break
-        except Exception as e:
-            st.error(f"엑셀 파일 처리 중 오류가 발생했습니다: {str(e)}")
-    
-    # Word 파일 처리
-    elif file_ext in ['docx', 'doc'] and DOCX_AVAILABLE:
-        try:
-            doc = docx.Document(uploaded_file)
-            paragraphs = [p.text for p in doc.paragraphs]
-            text_content = "\n".join(paragraphs)
-        except Exception as e:
-            st.error(f"워드 파일 처리 중 오류가 발생했습니다: {str(e)}")
-    
-    # PDF 파일 처리
-    elif file_ext == 'pdf' and PYPDF2_AVAILABLE:
-        try:
-            reader = PyPDF2.PdfReader(uploaded_file)
-            text_content = ""
-            for page in reader.pages:
-                text_content += page.extract_text()
-        except Exception as e:
-            st.error(f"PDF 파일 처리 중 오류가 발생했습니다: {str(e)}")
-    
-    # 텍스트에서 패턴으로 데이터 추출
-    if text_content:
-        # 회사명 패턴
-        company_patterns = [
-            r'회사\s*명\s*[:\s]+([^\n\r,]+)',
-            r'회사\s*[:\s]+([^\n\r,]+)',
-            r'상호\s*[:\s]+([^\n\r,]+)'
-        ]
-        for pattern in company_patterns:
-            matches = re.findall(pattern, text_content)
-            if matches:
-                extracted_data['company_name'] = matches[0].strip()
-                break
-        
-        # 자본총계 패턴
-        capital_patterns = [
-            r'자본총계\s*[:\s]+([\d,\.]+)',
-            r'자본\s*[:\s]+([\d,\.]+)',
-            r'총자본\s*[:\s]+([\d,\.]+)',
-            r'capital\s*[:\s]+([\d,\.]+)',
-            r'equity\s*[:\s]+([\d,\.]+)'
-        ]
-        extracted_data['total_equity'] = find_with_patterns(text_content, capital_patterns)
-        
-        # 당기순이익 패턴
-        profit_patterns = [
-            r'당기순이익\s*[:\s]+([\d,\.]+)',
-            r'순이익\s*[:\s]+([\d,\.]+)',
-            r'profit\s*[:\s]+([\d,\.]+)',
-            r'net income\s*[:\s]+([\d,\.]+)'
-        ]
-        profit_matches = []
-        for pattern in profit_patterns:
-            matches = re.findall(pattern, text_content, re.IGNORECASE)
-            profit_matches.extend(matches)
-        
-        if len(profit_matches) >= 3:
-            extracted_data['net_income1'] = int(re.sub(r'[^\d]', '', profit_matches[0]))
-            extracted_data['net_income2'] = int(re.sub(r'[^\d]', '', profit_matches[1]))
-            extracted_data['net_income3'] = int(re.sub(r'[^\d]', '', profit_matches[2]))
-        elif len(profit_matches) == 2:
-            extracted_data['net_income1'] = int(re.sub(r'[^\d]', '', profit_matches[0]))
-            extracted_data['net_income2'] = int(re.sub(r'[^\d]', '', profit_matches[1]))
-        elif len(profit_matches) == 1:
-            extracted_data['net_income1'] = int(re.sub(r'[^\d]', '', profit_matches[0]))
-        
-        # 주식수 패턴
-        shares_patterns = [
-            r'발행주식수\s*[:\s]+([\d,\.]+)',
-            r'주식수\s*[:\s]+([\d,\.]+)',
-            r'shares\s*[:\s]+([\d,\.]+)'
-        ]
-        extracted_data['shares'] = find_with_patterns(text_content, shares_patterns)
-        
-        # 액면가 패턴
-        face_value_patterns = [
-            r'액면가\s*[:\s]+([\d,\.]+)',
-            r'액면금액\s*[:\s]+([\d,\.]+)',
-            r'face value\s*[:\s]+([\d,\.]+)'
-        ]
-        extracted_data['share_price'] = find_with_patterns(text_content, face_value_patterns)
-    
-    return extracted_data
-
-# 추출한 데이터를 세션 상태에 적용하는 함수
-def apply_extracted_data(extracted_data):
-    if 'company_name' in extracted_data and extracted_data['company_name']:
-        st.session_state.company_name = extracted_data['company_name']
-    if 'total_equity' in extracted_data and extracted_data['total_equity']:
-        st.session_state.total_equity = extracted_data['total_equity']
-    if 'net_income1' in extracted_data and extracted_data['net_income1']:
-        st.session_state.net_income1 = extracted_data['net_income1']
-    if 'net_income2' in extracted_data and extracted_data['net_income2']:
-        st.session_state.net_income2 = extracted_data['net_income2']
-    if 'net_income3' in extracted_data and extracted_data['net_income3']:
-        st.session_state.net_income3 = extracted_data['net_income3']
-    if 'shares' in extracted_data and extracted_data['shares']:
-        st.session_state.shares = extracted_data['shares']
-    if 'share_price' in extracted_data and extracted_data['share_price']:
-        st.session_state.share_price = extracted_data['share_price']
-
-# PDF 생성 함수
-def generate_pdf():
-    global FPDF_AVAILABLE  # global 변수 선언 추가
-    
-    if not FPDF_AVAILABLE:
-        # FPDF를 자동으로 설치 시도
-        try:
-            import subprocess
-            subprocess.check_call(['pip', 'install', 'fpdf'])
-            FPDF_AVAILABLE = True
-        except:
-            return None
-    
-    try:
-        # PDF 객체 생성
-        pdf = FPDF()
-        pdf.add_page()
-        
-        # 기본 폰트 사용 (한글은 표시되지 않을 수 있음)
-        pdf.set_font('Arial', 'B', 16)
-        
-        # 제목
-        pdf.cell(190, 10, 'Unlisted Stock Valuation Report', 0, 1, 'C')
-        pdf.ln(10)
-        
-        # 기본 폰트 설정
-        pdf.set_font('Arial', '', 12)
-        
-        # 평가 정보
-        pdf.cell(190, 10, f'Date: {st.session_state.eval_date}', 0, 1)
-        pdf.cell(190, 10, f'Company: {st.session_state.company_name}', 0, 1)
-        pdf.ln(5)
-        
-        # 재무 정보
-        pdf.set_font('Arial', 'B', 14)
-        pdf.cell(190, 10, 'Financial Information', 0, 1)
-        pdf.set_font('Arial', '', 12)
-        pdf.cell(190, 10, f'Total Equity: {format_number(st.session_state.total_equity, True)} KRW', 0, 1)
-        pdf.cell(190, 10, f'Net Income (Year 1): {format_number(st.session_state.net_income1, True)} KRW (Weight 3)', 0, 1)
-        pdf.cell(190, 10, f'Net Income (Year 2): {format_number(st.session_state.net_income2, True)} KRW (Weight 2)', 0, 1)
-        pdf.cell(190, 10, f'Net Income (Year 3): {format_number(st.session_state.net_income3, True)} KRW (Weight 1)', 0, 1)
-        pdf.ln(5)
-        
-        # 주식 정보
-        pdf.set_font('Arial', 'B', 14)
-        pdf.cell(190, 10, 'Stock Information', 0, 1)
-        pdf.set_font('Arial', '', 12)
-        pdf.cell(190, 10, f'Total Shares: {format_number(st.session_state.shares)}', 0, 1)
-        pdf.cell(190, 10, f'Face Value: {format_number(st.session_state.share_price)} KRW', 0, 1)
-        pdf.cell(190, 10, f'Capitalization Rate: {st.session_state.interest_rate}%', 0, 1)
-        pdf.ln(5)
-        
-        # 평가 결과
-        if st.session_state.stock_value:
-            pdf.set_font('Arial', 'B', 14)
-            pdf.cell(190, 10, 'Valuation Results', 0, 1)
-            pdf.set_font('Arial', '', 12)
-            
-            pdf.cell(190, 10, f'Net Asset Value per Share: {format_number(st.session_state.stock_value["netAssetPerShare"])} KRW', 0, 1)
-            pdf.cell(190, 10, f'Income Value per Share: {format_number(st.session_state.stock_value["incomeValue"])} KRW', 0, 1)
-            pdf.cell(190, 10, f'Asset Value with Goodwill: {format_number(st.session_state.stock_value["assetValueWithGoodwill"])} KRW', 0, 1)
-            pdf.ln(5)
-            
-            pdf.set_font('Arial', 'B', 12)
-            pdf.cell(190, 10, f'Valuation Method: {st.session_state.stock_value["methodText"]}', 0, 1)
-            pdf.cell(190, 10, f'Final Value per Share: {format_number(st.session_state.stock_value["finalValue"])} KRW', 0, 1)
-            pdf.cell(190, 10, f'Total Company Value: {format_number(st.session_state.stock_value["totalValue"], True)} KRW', 0, 1)
-        
-        # PDF를 바이트로 변환 (안전한 방법 사용)
-        try:
-            # 방법 1: FPDF 기본 방식
-            pdf_output = pdf.output(dest='S').encode('latin-1')
-            return pdf_output
-        except Exception as e1:
-            try:
-                # 방법 2: 파일에 저장 후 읽기
-                import tempfile
-                import os
-                with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp:
-                    temp_path = tmp.name
-                
-                pdf.output(temp_path)
-                with open(temp_path, 'rb') as f:
-                    pdf_bytes = f.read()
-                
-                # 임시 파일 삭제
-                try:
-                    os.unlink(temp_path)
-                except:
-                    pass
-                
-                return pdf_bytes
-            except Exception as e2:
-                return None
-    
-    except Exception as e:
-        # 디버깅용 오류 출력
-        import traceback
-        print(f"PDF 생성 오류: {e}")
-        print(traceback.format_exc())
+# CSV 다운로드용 내용 생성
+def create_csv_content():
+    if not st.session_state.stock_value:
         return None
+    
+    # CSV 데이터 생성
+    data = {
+        '항목': ['평가 기준일', '회사명', '자본총계', '1년 전 당기순이익', '2년 전 당기순이익', '3년 전 당기순이익',
+                '총 발행주식수', '액면금액', '환원율', '순자산가치', '수익가치', 
+                '평가 방법', '주당 평가액', '기업 총 가치'],
+        '값': [str(st.session_state.eval_date), st.session_state.company_name,
+              st.session_state.total_equity, st.session_state.net_income1,
+              st.session_state.net_income2, st.session_state.net_income3,
+              st.session_state.shares, st.session_state.share_price,
+              st.session_state.interest_rate, 
+              st.session_state.stock_value["netAssetPerShare"],
+              st.session_state.stock_value["incomeValue"],
+              st.session_state.stock_value["methodText"],
+              st.session_state.stock_value["finalValue"],
+              st.session_state.stock_value["totalValue"]]
+    }
+    
+    # DataFrame 생성 후 CSV로 변환
+    df = pd.DataFrame(data)
+    csv = df.to_csv(index=False).encode('utf-8')
+    return csv
 
 # HTML 다운로드용 내용 생성
 def create_html_content():
@@ -515,33 +222,6 @@ def create_html_content():
     </html>
     """
     return html_content
-
-# CSV 다운로드용 내용 생성
-def create_csv_content():
-    if not st.session_state.stock_value:
-        return None
-    
-    # CSV 데이터 생성
-    data = {
-        '항목': ['평가 기준일', '회사명', '자본총계', '1년 전 당기순이익', '2년 전 당기순이익', '3년 전 당기순이익',
-                '총 발행주식수', '액면금액', '환원율', '순자산가치', '수익가치', 
-                '평가 방법', '주당 평가액', '기업 총 가치'],
-        '값': [str(st.session_state.eval_date), st.session_state.company_name,
-              st.session_state.total_equity, st.session_state.net_income1,
-              st.session_state.net_income2, st.session_state.net_income3,
-              st.session_state.shares, st.session_state.share_price,
-              st.session_state.interest_rate, 
-              st.session_state.stock_value["netAssetPerShare"],
-              st.session_state.stock_value["incomeValue"],
-              st.session_state.stock_value["methodText"],
-              st.session_state.stock_value["finalValue"],
-              st.session_state.stock_value["totalValue"]]
-    }
-    
-    # DataFrame 생성 후 CSV로 변환
-    df = pd.DataFrame(data)
-    csv = df.to_csv(index=False).encode('utf-8')
-    return csv
 
 # 비상장주식 가치 계산 함수
 def calculate_stock_value():
@@ -600,52 +280,6 @@ def calculate_stock_value():
 
 # 페이지 헤더
 st.title("비상장주식 가치평가")
-
-# 파일 업로드 섹션 (expander로 숨김)
-with st.expander("📤 파일 업로드 (엑셀, PDF, 워드)", expanded=False):
-    st.markdown("<div class='upload-section'>", unsafe_allow_html=True)
-    uploaded_file = st.file_uploader("재무정보가 포함된 파일을 업로드하세요", 
-                                    type=['xlsx', 'xls', 'pdf', 'docx', 'doc'])
-    
-    if uploaded_file is not None:
-        st.write(f"파일명: {uploaded_file.name}, 파일크기: {uploaded_file.size} bytes")
-        
-        # 데이터 추출 버튼
-        if st.button("📥 데이터 추출", key="extract_data"):
-            with st.spinner('파일에서 데이터를 추출 중입니다...'):
-                extracted_data = extract_data_from_file(uploaded_file)
-                
-                # 추출된 데이터 표시
-                if extracted_data:
-                    st.success("다음 데이터가 추출되었습니다:")
-                    
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        if 'company_name' in extracted_data:
-                            st.write(f"회사명: {extracted_data['company_name']}")
-                        if 'total_equity' in extracted_data:
-                            st.write(f"자본총계: {format_number(extracted_data['total_equity'])}원")
-                        if 'shares' in extracted_data:
-                            st.write(f"총 발행주식수: {format_number(extracted_data['shares'])}주")
-                    
-                    with col2:
-                        if 'net_income1' in extracted_data:
-                            st.write(f"1년 전 당기순이익: {format_number(extracted_data['net_income1'])}원")
-                        if 'net_income2' in extracted_data:
-                            st.write(f"2년 전 당기순이익: {format_number(extracted_data['net_income2'])}원")
-                        if 'net_income3' in extracted_data:
-                            st.write(f"3년 전 당기순이익: {format_number(extracted_data['net_income3'])}원")
-                        if 'share_price' in extracted_data:
-                            st.write(f"액면금액: {format_number(extracted_data['share_price'])}원")
-                    
-                    # 데이터 적용 버튼
-                    if st.button("💾 추출된 데이터 적용", key="apply_data"):
-                        apply_extracted_data(extracted_data)
-                        st.success("데이터가 적용되었습니다.")
-                        st.experimental_rerun()
-                else:
-                    st.warning("파일에서 추출 가능한 데이터를 찾지 못했습니다.")
-    st.markdown("</div>", unsafe_allow_html=True)
 
 # 평가 기준일 설정
 with st.expander("평가 기준일", expanded=True):
@@ -1067,47 +701,9 @@ if st.session_state.evaluated and st.session_state.stock_value:
     # 다운로드 섹션
     with st.expander("📥 평가 결과 다운로드", expanded=False):
         st.markdown("<div class='download-section'>", unsafe_allow_html=True)
-        tab1, tab2, tab3 = st.tabs(["PDF", "HTML", "CSV"])
+        tab1, tab2 = st.tabs(["HTML", "CSV"])
         
         with tab1:
-            # PDF 다운로드 버튼 직접 표시하기
-            if st.button("PDF 생성하기", key="generate_pdf", type="primary"):
-                with st.spinner("PDF 생성 중..."):
-                    pdf_data = generate_pdf()
-                    if pdf_data:
-                        st.success("PDF 생성 완료! 아래 버튼을 클릭하여 다운로드하세요.")
-                        st.download_button(
-                            label="📄 PDF 파일 다운로드",
-                            data=pdf_data,
-                            file_name=f"비상장주식_평가_{st.session_state.company_name}_{st.session_state.eval_date}.pdf",
-                            mime="application/pdf"
-                        )
-                    else:
-                        # 대체 PDF 생성 시도 (fpdf2 사용)
-                        try:
-                            import subprocess
-                            subprocess.check_call(['pip', 'install', 'fpdf2'])
-                            from fpdf import FPDF as FPDF2
-                            
-                            st.info("대체 방법으로 PDF 생성을 시도합니다...")
-                            pdf = FPDF2()
-                            pdf.add_page()
-                            pdf.set_font('Helvetica', 'B', 16)
-                            pdf.cell(40, 10, '비상장주식 평가 결과')
-                            pdf_bytes = pdf.output()
-                            
-                            st.success("PDF 생성 완료! 아래 버튼을 클릭하여 다운로드하세요.")
-                            st.download_button(
-                                label="📄 PDF 파일 다운로드 (기본 형식)",
-                                data=pdf_bytes,
-                                file_name=f"비상장주식_평가_{st.session_state.company_name}_{st.session_state.eval_date}_기본.pdf",
-                                mime="application/pdf"
-                            )
-                        except:
-                            st.error("PDF 생성에 실패했습니다. HTML 형식으로 다운로드해보세요.")
-                            st.info("또는 'pip install fpdf fpdf2' 명령으로 필요한 라이브러리를 설치해보세요.")
-        
-        with tab2:
             if st.button("HTML 파일 생성하기", key="generate_html"):
                 html_content = create_html_content()
                 st.download_button(
@@ -1117,7 +713,7 @@ if st.session_state.evaluated and st.session_state.stock_value:
                     mime="text/html"
                 )
         
-        with tab3:
+        with tab2:
             if st.button("CSV 파일 생성하기", key="generate_csv"):
                 csv_content = create_csv_content()
                 if csv_content:
