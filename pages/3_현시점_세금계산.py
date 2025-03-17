@@ -361,7 +361,7 @@ def calculate_transfer_tax(gain, acquisition_value):
     
     return tax, calculation_steps, effective_rate, transfer_profit
 
-# 청산소득세 계산 함수 - 수정: 청산소득금액 계산 추가
+# 청산소득세 계산 함수 - 이미지에 맞게 수정
 def calculate_liquidation_tax(total_value, acquisition_value, is_family_corp=False):
     # 청산소득금액 계산 - 자기자본(취득가액) 차감
     income = total_value - acquisition_value
@@ -369,32 +369,26 @@ def calculate_liquidation_tax(total_value, acquisition_value, is_family_corp=Fal
     calculation_steps = []
     calculation_steps.append({"description": "청산소득금액", "detail": f"보유주식가치({simple_format(total_value)}원) - 자기자본({simple_format(acquisition_value)}원) = {simple_format(income)}원"})
     
-    # 법인세 계산
-    if is_family_corp:
-        # 가족법인
-        if income <= 20000000000:
-            corporate_tax = income * 0.19
-            calculation_steps.append({"description": "법인세(가족법인, 200억 이하)", "detail": f"{simple_format(income)}원 × 19% = {simple_format(corporate_tax)}원"})
-        elif income <= 300000000000:
-            corporate_tax = 20000000000 * 0.19 + (income - 20000000000) * 0.21
-            calculation_steps.append({"description": "법인세(가족법인)", "detail": f"200억원 × 19% + {simple_format(income - 20000000000)}원 × 21% = {simple_format(corporate_tax)}원"})
-        else:
-            corporate_tax = 20000000000 * 0.19 + (300000000000 - 20000000000) * 0.21 + (income - 300000000000) * 0.24
-            calculation_steps.append({"description": "법인세(가족법인)", "detail": f"200억원 × 19% + 2,800억원 × 21% + {simple_format(income - 300000000000)}원 × 24% = {simple_format(corporate_tax)}원"})
-    else:
-        # 일반법인
-        if income <= 200000000:
+    # 법인세 계산 - 일반 법인인 경우 (가족법인 아닌 경우)
+    if not is_family_corp:
+        if income <= 200000000:  # 2억원 이하
             corporate_tax = income * 0.09
             calculation_steps.append({"description": "법인세(2억 이하)", "detail": f"{simple_format(income)}원 × 9% = {simple_format(corporate_tax)}원"})
-        elif income <= 20000000000:
+        else:  # 2억원 초과
+            # 2억원까지는 9%, 나머지는 19% 적용
             corporate_tax = 200000000 * 0.09 + (income - 200000000) * 0.19
             calculation_steps.append({"description": "법인세", "detail": f"2억원 × 9% + {simple_format(income - 200000000)}원 × 19% = {simple_format(corporate_tax)}원"})
-        elif income <= 300000000000:
-            corporate_tax = 200000000 * 0.09 + (20000000000 - 200000000) * 0.19 + (income - 20000000000) * 0.21
-            calculation_steps.append({"description": "법인세", "detail": f"2억원 × 9% + 198억원 × 19% + {simple_format(income - 20000000000)}원 × 21% = {simple_format(corporate_tax)}원"})
-        else:
-            corporate_tax = 200000000 * 0.09 + (20000000000 - 200000000) * 0.19 + (300000000000 - 20000000000) * 0.21 + (income - 300000000000) * 0.24
-            calculation_steps.append({"description": "법인세", "detail": f"2억원 × 9% + 198억원 × 19% + 2,800억원 × 21% + {simple_format(income - 300000000000)}원 × 24% = {simple_format(corporate_tax)}원"})
+    else:  # 가족법인인 경우
+        # 가족법인 법인세율 (19%~24% 구간별 적용)
+        if income <= 20000000000:  # 200억 이하
+            corporate_tax = income * 0.19
+            calculation_steps.append({"description": "법인세(가족법인, 200억 이하)", "detail": f"{simple_format(income)}원 × 19% = {simple_format(corporate_tax)}원"})
+        elif income <= 300000000000:  # 200억 초과 3000억 이하
+            corporate_tax = 20000000000 * 0.19 + (income - 20000000000) * 0.21
+            calculation_steps.append({"description": "법인세(가족법인)", "detail": f"200억원 × 19% + {simple_format(income - 20000000000)}원 × 21% = {simple_format(corporate_tax)}원"})
+        else:  # 3000억 초과
+            corporate_tax = 20000000000 * 0.19 + (300000000000 - 20000000000) * 0.21 + (income - 300000000000) * 0.24
+            calculation_steps.append({"description": "법인세(가족법인)", "detail": f"200억원 × 19% + 2,800억원 × 21% + {simple_format(income - 300000000000)}원 × 24% = {simple_format(corporate_tax)}원"})
     
     # 배당소득세 계산
     after_tax = income - corporate_tax
@@ -438,7 +432,9 @@ def calculate_tax_details(value, owned_shares, share_price, is_family_corp=False
         "liquidationRate": liquidation_rate,
         "acquisitionValue": acquisition_value,
         "transferProfit": transfer_profit,
-        "liquidationIncome": liquidation_income
+        "liquidationIncome": liquidation_income,
+        "corporateTax": corporate_tax,
+        "dividendTax": dividend_tax
     }
 
 # 메인 코드
@@ -581,260 +577,4 @@ else:
     <div class="best-option-box" style="border-left: 5px solid {best_color};">
         <p class="best-option-text">현재 기업가치 수준에서는 <span style="font-weight: bold; color: {best_color};">{best_option}</span>가 세금 부담이 가장 적습니다.</p>
     </div>
-    """, unsafe_allow_html=True)
-    
-    # 세금 비교 테이블 (균형있게) - 양도소득세 표시 수정
-    st.markdown(f"""
-    <table class="tax-compare-table">
-        <thead>
-            <tr>
-                <th width="33.3%">세금 유형</th>
-                <th width="33.3%">세액</th>
-                <th width="33.3%">실효세율</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr class="{inherit_class}">
-                <td>증여세</td>
-                <td class="tax-amount">{simple_format(tax_details['inheritanceTax'])}원</td>
-                <td>{tax_details['inheritanceRate']:.1f}%</td>
-            </tr>
-            <tr class="{transfer_class}">
-                <td>양도소득세(지방소득세 포함)</td>
-                <td class="tax-amount">{simple_format(tax_details['transferTax'])}원</td>
-                <td>{tax_details['transferRate']:.1f}%</td>
-            </tr>
-            <tr class="{liquid_class}">
-                <td>청산소득세</td>
-                <td class="tax-amount">{simple_format(tax_details['liquidationTax'])}원</td>
-                <td>{tax_details['liquidationRate']:.1f}%</td>
-            </tr>
-        </tbody>
-    </table>
-    """, unsafe_allow_html=True)
-    
-    st.markdown("<p style='margin-top: 15px; font-size:14px;'>주의: 이는 단순 세금 비교이며, 실제 의사결정은 개인 상황, 자산 구성, 사업 목표 등을 고려해야 합니다.</p>", unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True)
-    
-    # 적용 세율 정보
-    with st.expander("적용 세율 정보"):
-        st.markdown("<div class='tax-info-section'>", unsafe_allow_html=True)
-        st.markdown("<h4>증여세율</h4>", unsafe_allow_html=True)
-        st.markdown("<ul>", unsafe_allow_html=True)
-        st.markdown("<li>1억 이하: 10%</li>", unsafe_allow_html=True)
-        st.markdown("<li>1억~5억: 20%</li>", unsafe_allow_html=True)
-        st.markdown("<li>5억~10억: 30%</li>", unsafe_allow_html=True)
-        st.markdown("<li>10억~30억: 40%</li>", unsafe_allow_html=True)
-        st.markdown("<li>30억 초과: 50%</li>", unsafe_allow_html=True)
-        st.markdown("</ul>", unsafe_allow_html=True)
-        
-        st.markdown("<h4>양도소득세율(지방소득세 포함)</h4>", unsafe_allow_html=True)
-        st.markdown("<ul>", unsafe_allow_html=True)
-        st.markdown("<li>3억 이하: 22%</li>", unsafe_allow_html=True)
-        st.markdown("<li>3억 초과: 27.5%</li>", unsafe_allow_html=True)
-        st.markdown("<li>기본공제: 250만원</li>", unsafe_allow_html=True)
-        st.markdown("</ul>", unsafe_allow_html=True)
-        
-        st.markdown("<h4>법인세율 (2025년 기준)</h4>", unsafe_allow_html=True)
-        st.markdown("<ul>", unsafe_allow_html=True)
-        if is_family_corp:
-            st.markdown("<li>가족법인 200억 이하: 19%</li>", unsafe_allow_html=True)
-            st.markdown("<li>200억~3,000억: 21%</li>", unsafe_allow_html=True)
-            st.markdown("<li>3,000억 초과: 24%</li>", unsafe_allow_html=True)
-        else:
-            st.markdown("<li>2억 이하: 9%</li>", unsafe_allow_html=True)
-            st.markdown("<li>2억~200억: 19%</li>", unsafe_allow_html=True)
-            st.markdown("<li>200억~3,000억: 21%</li>", unsafe_allow_html=True)
-            st.markdown("<li>3,000억 초과: 24%</li>", unsafe_allow_html=True)
-        st.markdown("<li>배당소득세: 15.4%</li>", unsafe_allow_html=True)
-        st.markdown("</ul>", unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
-    
-    # 참고사항
-    st.markdown("<div class='warning-box'>", unsafe_allow_html=True)
-    st.markdown("※ 이 계산기의 세금 계산은 참고용으로만 사용하시기 바랍니다. 실제 세금은 개인 상황, 보유기간, 대주주 여부, 사업 형태 등에 따라 달라질 수 있습니다.", unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True)
-    
-    # 버튼 행
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("주식가치 결과로 돌아가기", use_container_width=True):
-            try:
-                st.switch_page("2_주식가치_결과.py")
-            except:
-                st.markdown("<div class='sidebar-guide'>왼쪽 사이드바에서 <b>주식가치 결과</b> 메뉴를 클릭하여 이동하세요.</div>", unsafe_allow_html=True)
-    
-    with col2:
-        if st.button("미래 주식가치 계산하기", type="primary", use_container_width=True):
-            try:
-                st.switch_page("4_미래_주식가치.py")
-            except:
-                st.markdown("<div class='sidebar-guide'>왼쪽 사이드바에서 <b>미래 주식가치</b> 메뉴를 클릭하여 이동하세요.</div>", unsafe_allow_html=True)
-
-    # 다운로드 섹션 추가
-    st.markdown("---")
-    with st.expander("📥 평가 결과 다운로드", expanded=False):
-        st.markdown("<div class='download-section'>", unsafe_allow_html=True)
-        tab1, tab2, tab3 = st.tabs(["PDF", "HTML", "CSV"])
-        
-        # PDF 다운로드 탭
-        with tab1:
-            if st.button("PDF 생성하기", key="generate_pdf", type="primary"):
-                with st.spinner("PDF 생성 중..."):
-                    pdf_data = generate_pdf(tax_details, company_name, owned_shares, share_price, eval_date, is_family_corp)
-                    
-                    if pdf_data:
-                        st.success("PDF 생성 완료!")
-                        st.download_button(
-                            label="📄 PDF 파일 다운로드",
-                            data=pdf_data,
-                            file_name=f"세금분석_{company_name}_{eval_date.strftime('%Y%m%d')}.pdf",
-                            mime="application/pdf"
-                        )
-                    else:
-                        st.markdown("<div class='alert-warning'>PDF 생성에 실패했습니다. HTML 형식으로 다운로드해보세요.</div>", unsafe_allow_html=True)
-                        st.markdown("<div class='alert-info'>또는 'pip install fpdf fpdf2' 명령으로 필요한 라이브러리를 설치해보세요.</div>", unsafe_allow_html=True)
-        
-        # HTML 다운로드 탭
-        with tab2:
-            if st.button("HTML 보고서 생성하기", key="generate_html"):
-                # HTML 내용 생성
-                html_content = f"""
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <meta charset="UTF-8">
-                    <title>비상장주식 세금 분석 - {company_name}</title>
-                    <style>
-                        body {{ font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; }}
-                        h1 {{ color: #2c3e50; text-align: center; }}
-                        h2 {{ color: #3498db; margin-top: 20px; }}
-                        .info {{ margin-bottom: 5px; }}
-                        .tax-box {{ background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin: 10px 0; border-left: 4px solid #3498db; }}
-                        .result {{ margin-top: 10px; font-weight: bold; }}
-                        .results-table {{ width: 100%; border-collapse: collapse; margin: 20px 0; }}
-                        .results-table th, .results-table td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
-                        .results-table th {{ background-color: #f2f2f2; }}
-                        .best-option {{ background-color: #e6f7e6; padding: 10px; border-radius: 5px; margin: 10px 0; border-left: 4px solid #28a745; }}
-                    </style>
-                </head>
-                <body>
-                    <h1>비상장주식 세금 분석 보고서</h1>
-                    
-                    <h2>기본 정보</h2>
-                    <div class="info">회사명: {company_name}</div>
-                    <div class="info">평가 기준일: {eval_date.strftime('%Y년 %m월 %d일')}</div>
-                    <div class="info">주당 평가액: {simple_format(stock_value["finalValue"])}원</div>
-                    <div class="info">회사 총 가치: {simple_format(stock_value["totalValue"])}원</div>
-                    <div class="info">대표이사 보유주식 가치: {simple_format(stock_value["ownedValue"])}원</div>
-                    <div class="info">취득가액(자기자본): {simple_format(tax_details["acquisitionValue"])}원</div>
-                    
-                    <h2>세금 분석 결과</h2>
-                    <table class="results-table">
-                        <tr>
-                            <th>세금 유형</th>
-                            <th>세액</th>
-                            <th>실효세율</th>
-                        </tr>
-                        <tr>
-                            <td>증여세</td>
-                            <td>{simple_format(tax_details['inheritanceTax'])}원</td>
-                            <td>{tax_details['inheritanceRate']:.1f}%</td>
-                        </tr>
-                        <tr>
-                            <td>양도소득세(지방소득세 포함)</td>
-                            <td>{simple_format(tax_details['transferTax'])}원</td>
-                            <td>{tax_details['transferRate']:.1f}%</td>
-                        </tr>
-                        <tr>
-                            <td>청산소득세</td>
-                            <td>{simple_format(tax_details['liquidationTax'])}원</td>
-                            <td>{tax_details['liquidationRate']:.1f}%</td>
-                        </tr>
-                    </table>
-                    
-                    <div class="best-option">
-                        <h3>최적의 세금 옵션: {best_option}</h3>
-                        <p>현재 기업가치 수준에서는 {best_option}가 세금 부담이 가장 적습니다.</p>
-                    </div>
-                    
-                    <h2>세금 계산 세부내역</h2>
-                    
-                    <div class="tax-box">
-                        <h3>증여세 계산</h3>
-                        <p>과세표준: {simple_format(stock_value['ownedValue'])}원</p>
-                        <ul>
-                            {''.join([f"<li>{step['bracket']}: {simple_format(step['amount'])}원 × {int(step['rate']*100)}% = {simple_format(step['tax'])}원</li>" for step in tax_details['inheritanceSteps']])}
-                        </ul>
-                        <p><b>총 증여세: {simple_format(tax_details['inheritanceTax'])}원</b> (실효세율: {tax_details['inheritanceRate']:.1f}%)</p>
-                    </div>
-                    
-                    <div class="tax-box">
-                        <h3>양도소득세(지방소득세 포함) 계산</h3>
-                        <ul>
-                            {''.join([f"<li>{step['description']}: {step['detail']}</li>" for step in tax_details['transferSteps']])}
-                        </ul>
-                        <p><b>총 양도소득세: {simple_format(tax_details['transferTax'])}원</b> (실효세율: {tax_details['transferRate']:.1f}%)</p>
-                    </div>
-                    
-                    <div class="tax-box">
-                        <h3>청산소득세 계산</h3>
-                        <ul>
-                            {''.join([f"<li>{step['description']}: {step['detail']}</li>" for step in tax_details['liquidationSteps']])}
-                        </ul>
-                        <p><b>총 청산소득세: {simple_format(tax_details['liquidationTax'])}원</b> (실효세율: {tax_details['liquidationRate']:.1f}%)</p>
-                    </div>
-                    
-                    <div style="margin-top: 30px; padding: 10px; background-color: #fff3cd; border-radius: 5px;">
-                        <p><b>참고:</b> 이 보고서의 세금 계산은 참고용으로만 사용하시기 바랍니다. 실제 세금은 개인 상황, 보유기간, 대주주 여부, 사업 형태 등에 따라 달라질 수 있습니다.</p>
-                    </div>
-                    
-                    <div style="margin-top: 30px; text-align: center; color: #777; font-size: 0.9em;">
-                        <p>생성일: {datetime.now().strftime('%Y년 %m월 %d일')}</p>
-                    </div>
-                </body>
-                </html>
-                """
-                
-                st.download_button(
-                    label="📄 HTML 파일 저장하기",
-                    data=html_content,
-                    file_name=f"세금분석_{company_name}_{eval_date.strftime('%Y%m%d')}.html",
-                    mime="text/html"
-                )
-                
-                st.info("HTML 파일을 다운로드 후 브라우저에서 열어 인쇄하면 PDF로 저장할 수 있습니다.")
-        
-        # CSV 다운로드 탭
-        with tab3:
-            if st.button("CSV 데이터 생성하기", key="generate_csv"):
-                # CSV 데이터 생성
-                data = {
-                    '항목': [
-                        '회사명', '평가 기준일', '주당 평가액', '회사 총가치', '대표이사 보유주식 가치', '취득가액(자기자본)',
-                        '증여세', '증여세 실효세율', 
-                        '양도소득세(지방소득세 포함)', '양도소득세 실효세율', 
-                        '청산소득세', '청산소득세 실효세율',
-                        '최적 세금 옵션'
-                    ],
-                    '값': [
-                        company_name, str(eval_date), stock_value['finalValue'], stock_value['totalValue'], stock_value['ownedValue'], tax_details['acquisitionValue'],
-                        tax_details['inheritanceTax'], f"{tax_details['inheritanceRate']:.1f}%",
-                        tax_details['transferTax'], f"{tax_details['transferRate']:.1f}%",
-                        tax_details['liquidationTax'], f"{tax_details['liquidationRate']:.1f}%",
-                        best_option
-                    ]
-                }
-                
-                # DataFrame 생성 후 CSV로 변환
-                df = pd.DataFrame(data)
-                csv = df.to_csv(index=False).encode('utf-8')
-                
-                st.download_button(
-                    label="📄 CSV 파일 저장하기",
-                    data=csv,
-                    file_name=f"세금분석_{company_name}_{eval_date.strftime('%Y%m%d')}.csv",
-                    mime="text/csv"
-                )
-        
-        st.markdown("</div>", unsafe_allow_html=True)
+    """, unsafe_allow
