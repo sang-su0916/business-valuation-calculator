@@ -163,65 +163,12 @@ else:
         st.plotly_chart(fig, use_container_width=True)
     st.markdown("</div>", unsafe_allow_html=True)
     
-    # 다운로드 섹션 추가
+    # 다운로드 섹션 추가 (PDF 탭 제거)
     with st.expander("📥 평가 결과 다운로드", expanded=False):
         st.markdown("<div class='download-section'>", unsafe_allow_html=True)
-        tab1, tab2, tab3 = st.tabs(["PDF", "HTML", "CSV"])
+        tab1, tab2 = st.tabs(["HTML", "CSV"])
         
         with tab1:
-            if st.button("PDF 생성하기", key="generate_pdf", type="primary"):
-                try:
-                    # 바로 처리 시도
-                    import subprocess
-                    subprocess.check_call(['pip', 'install', 'fpdf2'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                    from fpdf import FPDF
-                    
-                    with st.spinner("PDF 생성 중..."):
-                        # 간단한 PDF 생성
-                        pdf = FPDF()
-                        pdf.add_page()
-                        pdf.set_font('Helvetica', 'B', 16)
-                        pdf.cell(0, 10, 'Stock Valuation Report', 0, 1, 'C')
-                        
-                        pdf.ln(10)
-                        pdf.set_font('Helvetica', '', 12)
-                        pdf.cell(0, 10, f'Company: {company_name}', 0, 1)
-                        pdf.cell(0, 10, f'Date: {eval_date}', 0, 1)
-                        pdf.cell(0, 10, f'Valuation Method: {stock_value["methodText"]}', 0, 1)
-                        pdf.ln(5)
-                        
-                        # 결과 데이터 추가
-                        pdf.set_font('Helvetica', 'B', 14)
-                        pdf.cell(0, 10, 'Valuation Results', 0, 1)
-                        pdf.set_font('Helvetica', '', 12)
-                        
-                        pdf.cell(0, 10, f'Net Asset Value per Share: {format_number(stock_value["netAssetPerShare"])} KRW', 0, 1)
-                        pdf.cell(0, 10, f'Income Value per Share: {format_number(stock_value["incomeValue"])} KRW', 0, 1)
-                        pdf.cell(0, 10, f'Asset Value with Goodwill: {format_number(stock_value["assetValueWithGoodwill"])} KRW', 0, 1)
-                        pdf.cell(0, 10, f'Final Value per Share: {format_number(stock_value["finalValue"])} KRW', 0, 1)
-                        pdf.cell(0, 10, f'Total Company Value: {format_number(stock_value["totalValue"])} KRW', 0, 1)
-                        
-                        if 'increasePercentage' in stock_value:
-                            pdf.ln(5)
-                            pdf.cell(0, 10, f'Value Increase Percentage: {stock_value["increasePercentage"]}%', 0, 1)
-                        
-                        # PDF 데이터 얻기
-                        pdf_data = pdf.output()
-                        
-                        # 다운로드 버튼 표시
-                        st.success("PDF 생성 완료!")
-                        st.download_button(
-                            label="📄 PDF 파일 다운로드",
-                            data=pdf_data,
-                            file_name=f"주식가치_평가결과_{company_name}_{eval_date}.pdf",
-                            mime="application/pdf"
-                        )
-                except Exception as e:
-                    st.error("PDF 생성에 실패했습니다.")
-                    st.info("HTML 혹은 CSV 형식으로 다운로드해 보세요.")
-                    st.code("pip install fpdf2", language="bash")
-        
-        with tab2:
             if st.button("HTML 파일 생성하기", key="generate_html"):
                 # HTML 내용 생성
                 html_content = f"""
@@ -295,7 +242,7 @@ else:
                     mime="text/html"
                 )
         
-        with tab3:
+        with tab2:
             if st.button("CSV 파일 생성하기", key="generate_csv"):
                 # CSV 데이터 생성
                 data = {
