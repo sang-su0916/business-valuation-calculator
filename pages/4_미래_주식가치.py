@@ -98,70 +98,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# PDF 생성 함수
-def generate_pdf(current_value, future_value, company_name, growth_rate, future_years):
-    try:
-        # FPDF 라이브러리 자동 설치 시도
-        try:
-            from fpdf import FPDF
-        except ImportError:
-            try:
-                import subprocess
-                subprocess.check_call(['pip', 'install', 'fpdf'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                from fpdf import FPDF
-            except:
-                return None
-        
-        # PDF 객체 생성
-        pdf = FPDF()
-        pdf.add_page()
-        
-        # 기본 폰트 설정 (한글 지원 제한)
-        pdf.set_font('Arial', 'B', 16)
-        
-        # 제목
-        pdf.cell(190, 10, 'Future Stock Value Prediction Report', 0, 1, 'C')
-        pdf.ln(5)
-        
-        # 회사 정보
-        pdf.set_font('Arial', 'B', 12)
-        pdf.cell(190, 10, f'Company: {company_name}', 0, 1)
-        pdf.ln(5)
-        
-        # 예측 정보
-        pdf.set_font('Arial', '', 11)
-        pdf.cell(190, 10, f'Growth Rate: {growth_rate}% per year', 0, 1)
-        pdf.cell(190, 10, f'Prediction Period: {future_years} years', 0, 1)
-        pdf.ln(5)
-        
-        # 현재 및 미래 가치
-        pdf.set_font('Arial', 'B', 12)
-        pdf.cell(190, 10, 'Valuation Results:', 0, 1)
-        pdf.set_font('Arial', '', 11)
-        pdf.cell(190, 10, f'Current Value per Share: {format_number(current_value["finalValue"])} KRW', 0, 1)
-        pdf.cell(190, 10, f'Future Value per Share: {format_number(future_value["finalValue"])} KRW', 0, 1)
-        pdf.cell(190, 10, f'Current Total Company Value: {format_number(current_value["totalValue"])} KRW', 0, 1)
-        pdf.cell(190, 10, f'Future Total Company Value: {format_number(future_value["totalValue"])} KRW', 0, 1)
-        
-        # 증가율
-        value_increase = (future_value["finalValue"] / current_value["finalValue"] - 1) * 100
-        pdf.ln(5)
-        pdf.set_font('Arial', 'B', 11)
-        pdf.cell(190, 10, f'Expected Value Increase: +{value_increase:.1f}% (after {future_years} years)', 0, 1)
-        
-        # 생성일
-        pdf.ln(10)
-        pdf.set_font('Arial', 'I', 8)
-        pdf.cell(190, 10, f'Generated on: {datetime.now().strftime("%Y-%m-%d")}', 0, 1)
-        
-        # PDF를 바이트로 변환
-        try:
-            return pdf.output(dest='S').encode('latin-1')
-        except Exception as e:
-            return None
-    except Exception as e:
-        return None
-
 # HTML 다운로드용 내용 생성
 def create_html_content(current_value, future_value, company_name, growth_rate, future_years):
     target_year = datetime.now().year + future_years
@@ -681,28 +617,10 @@ else:
         st.markdown("---")
         with st.expander("📥 평가 결과 다운로드", expanded=False):
             st.markdown("<div class='download-section'>", unsafe_allow_html=True)
-            tab1, tab2, tab3 = st.tabs(["PDF", "HTML", "CSV"])
-            
-            # PDF 다운로드 탭
-            with tab1:
-                if st.button("PDF 생성하기", key="generate_pdf", type="primary"):
-                    with st.spinner("PDF 생성 중..."):
-                        pdf_data = generate_pdf(stock_value, future_stock_value, company_name, growth_rate, future_years)
-                        
-                        if pdf_data:
-                            st.success("PDF 생성 완료!")
-                            st.download_button(
-                                label="📄 PDF 파일 다운로드",
-                                data=pdf_data,
-                                file_name=f"미래주식가치_{company_name}_{target_year}.pdf",
-                                mime="application/pdf"
-                            )
-                        else:
-                            st.warning("PDF 생성에 실패했습니다. HTML 형식으로 다운로드해보세요.")
-                            st.info("또는 'pip install fpdf fpdf2' 명령으로 필요한 라이브러리를 설치해보세요.")
+            tab1, tab2 = st.tabs(["HTML", "CSV"])
             
             # HTML 다운로드 탭
-            with tab2:
+            with tab1:
                 if st.button("HTML 보고서 생성하기", key="generate_html"):
                     html_content = create_html_content(stock_value, future_stock_value, company_name, growth_rate, future_years)
                     
@@ -716,7 +634,7 @@ else:
                     st.info("HTML 파일을 다운로드 후 브라우저에서 열어 인쇄하면 PDF로 저장할 수 있습니다.")
             
             # CSV 다운로드 탭
-            with tab3:
+            with tab2:
                 if st.button("CSV 데이터 생성하기", key="generate_csv"):
                     csv_content = create_csv_content(stock_value, future_stock_value, company_name, growth_rate, future_years)
                     
